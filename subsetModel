@@ -1,0 +1,23 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import stats
+import math
+import utilities as ut
+
+
+class SubsetModel:
+    dim=0
+    name=''
+
+    def is_in_subset(self,x,d):
+        return False
+    def inverse(self,x):
+        return -1
+    def uniform(self,dmin,dmax):
+        def f(x):
+            return 0
+        return {'size':1,'density':f,'points':[]}
+
+    def __init__(self):
+        def is_in_subset(self,x,d):
+            return True

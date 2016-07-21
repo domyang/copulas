@@ -1,0 +1,15 @@
+# Runs tests with spline.py
+
+python spline.py \
+--L1Linf-solver=ipopt \
+--L2Norm-solver=ipopt \
+--seg-N=100 \
+--seg-kappa=1.1 \
+--epifit-error-norm='L1' \
+--mip-tolerances-integrality=0.1 \
+--mip-tolerances-mipgap=0.1 \
+--mip-tolerances-absmipgap=0.1 \
+--mip-tolerances-integrality=0.1 \
+--mip-tolerances-mipgap=0.1 \
+--mip-tolerances-absmipgap=0.1 \
+
