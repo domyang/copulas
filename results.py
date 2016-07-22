@@ -5,6 +5,10 @@ import numpy as np
 import pickle
 from scipy import stats
 
+class HorseResults:
+    def __init__(self):
+        pass
+
 def compile_results(results_dict, dir_name=None):
     if dir_name is None:  # Only used if the parameters key exists
         params = results_dict['parameters']
@@ -80,6 +84,14 @@ def merge_results(*results):
         for i, log in enumerate(result['log']):
             new_results[]
 """
+
+def join_results(list_of_results):
+    new_results = list_of_results[0].copy()
+    for result in list_of_results[1:]:
+        for name in ['past_log', 'rank', 'log', 'len', 'proj_emd', 'selected_model', 'proj_quantile']:
+            new_results[name].extend(result[name])
+
+    return new_results
 
 def get_emds(res):
     emds = res['proj_emd']

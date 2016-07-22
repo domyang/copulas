@@ -1,11 +1,5 @@
 import matplotlib.pyplot as plt
-# from pyemd import emd
-from pylab import rcParams
-import numpy as np
-import scipy as sc
 import dateutil.parser as dt
-from dateutil.relativedelta import relativedelta
-import spline
 import utilities as ut
 
 
@@ -21,8 +15,8 @@ import utilities as ut
 class CopulaManager:
     length = 0
     dim = 0
-    vect = []  # a list of float: the real data to be considered
-    date = []  # a list (of ints) of ordered date
+    vect = []  # a list of floats: the real data to be considered
+    date = []  # a list of ints of ordered date
     data = {}  # a dictionary of lists, additional parameters considered during the creation of the window
 
     # dictionary defining 3 things:

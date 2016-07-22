@@ -451,7 +451,7 @@ def list_derivative(l, width=5):
 # ------------------------------ utils for plots ------------------------------------------------
 
 
-### returns a color list corresponding to 'vect' values
+# returns a color list corresponding to 'vect' values
 # returns:
 #   () col : list of 3-elements tuples (->rgb colors)
 # arguments:
@@ -981,7 +981,7 @@ def compute_distance_emd(a1, a2, b1, b2, precision=10):
 """
 
 
-### uses a plugin to compute the emd (earth mover distance) between two lists of coordinate lists
+# uses a plugin to compute the emd (earth mover distance) between two lists of coordinate lists
 def compute_emd(v1, v2, norm=2):
     length = len(v1)
     if len(v2) != length:
@@ -1016,7 +1016,7 @@ def compute_emd(v1, v2, norm=2):
     return emd(array1, array2, m)
 
 
-### returns a L-distance between two copulae:
+# returns a L-distance between two copulae:
 # arguments:
 #   () unif1,unif2: list of lists -> points of a copula
 #   () precision
@@ -1101,7 +1101,7 @@ def compute_distance_l(unif1, unif2, precision=30, rand=False, norm=2):
     #     res=bins[]
 
 
-### returns the log likelihood of vect1,
+# returns the log likelihood of vect1,
 def emp_log_likelihood(vect1, vect2, density1=None, density2=None, visualize=False):
     dim, dim2 = len(vect1), len(vect2)
     if (dim != dim2) | (dim < 1):
@@ -1126,7 +1126,7 @@ def emp_log_likelihood(vect1, vect2, density1=None, density2=None, visualize=Fal
     return ((a + b) / 2, a, b)
 
 
-### returns the projection of vectors along axis [1,1..1],[-1,1,..1],[1,-1,..,1] etc as a list of lists
+# returns the projection of vectors along axis [1,1..1],[-1,1,..1],[1,-1,..,1] etc as a list of lists
 # arguments:
 #   () copula: if True, it supposes that vects are uniforms and makes it so that the projections are in (0,1)
 def tail_projection(vects, copula=True):
@@ -1157,7 +1157,7 @@ def tail_projection(vects, copula=True):
     return res
 
 
-### returns the EMD (earth-mover-distance) between the first and last quantile of two list of points.
+# returns the EMD (earth-mover-distance) between the first and last quantile of two list of points.
 # vec1 and vec2 need not have the same length
 def univariate_EMD_in_tails(vec1, vec2, quantile=0.1):
     a = sorted(vec1)
@@ -1216,8 +1216,8 @@ def univariate_EMD_in_tails(vec1, vec2, quantile=0.1):
     return res
 
 
-### returns the EMD distance between the projections of simulations items and past_obs
-### also returns the quantile of the projections of obs as compared to the projections of simulations items
+# returns the EMD distance between the projections of simulations items and past_obs
+# also returns the quantile of the projections of obs as compared to the projections of simulations items
 def compare_tails(simulations, past_obs, obs, quantile=0.1, visualize=False):
     proj_past_obs = tail_projection(past_obs)
     proj_obs = tail_projection([[i] for i in obs])
@@ -1269,7 +1269,7 @@ def redistribute_gaussian(vect1, vect2, length=0, fit=True):
     return (redistributed[0], redistributed[1], count)
 
 
-### returns pearson's rho (correlation of the ranks = correlation of the empirical copula)
+# returns pearson's rho (correlation of the ranks = correlation of the empirical copula)
 # arguments:
 #   () vects: list of coordinates lists
 #   () holes: value of 'vects' that should be ignored (for missing data...)
