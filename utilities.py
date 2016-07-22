@@ -16,7 +16,6 @@ import ephem
 import random
 from scipy import stats
 
-
 home_dir = 'C:\\users\\sabrina\\documents\\research\\code for real user\\'
 
 sys.path.append(home_dir + 'prescient/release/Prescient_1.0/')
@@ -105,7 +104,7 @@ def find_spline(x, y, options=None, visualize=False, seg_N=5, positiveness_const
         a.append((model.a.get_values())[i])
 
     dico = {'a': a, 's0': s0, 'v0': v0, 'min_x': min_x, 'max_x': max_x, 'N': N, 'factor_x': factor_x,
-            'factor_y': factor_y, 'offset': offset,'positiveness_constraint':positiveness_constraint}
+            'factor_y': factor_y, 'offset': offset, 'positiveness_constraint': positiveness_constraint}
 
     if visualize:
         print(dico)
@@ -152,7 +151,7 @@ def create_spline(dico):
         res += s0 + t_temp * v0
         res *= factor_y
         if dico['positiveness_constraint']:
-            res=max(res,0)
+            res = max(res, 0)
         return res
 
     return (f)
@@ -189,7 +188,7 @@ def create_spline_d(dico):
 
 
 ### if x is sorted, and y=f(x), return a linear interpolation function
-def interpol_simple(x, y, positive=True,exp_tails=True):
+def interpol_simple(x, y, positive=True, exp_tails=True):
     length = len(x)
     if (len(y) != length):
         print('WARNING: x and y should be same length')
@@ -229,36 +228,37 @@ def interpol_simple(x, y, positive=True,exp_tails=True):
         return f
     else:
         def g(a):
-            return max(f(a),0)
+            return max(f(a), 0)
+
         return g
+
 
 ### use interpolation splines to approximate a scipy.stats object fast
 class fast_stats(object):
-
-    def __init__(self,obj,prec=5000,method='linear'):
+    def __init__(self, obj, prec=5000, method='linear'):
 
         # for the ppf
-        max_derivative=20
-        min_ppf = opt.brentq(lambda x: 1/obj.pdf(obj.ppf(x))-max_derivative,0.01,0.5)
-        max_ppf = opt.brentq(lambda x: 1/obj.pdf(obj.ppf(x))-max_derivative,0.5,0.99)
+        max_derivative = 20
+        min_ppf = opt.brentq(lambda x: 1 / obj.pdf(obj.ppf(x)) - max_derivative, 0.01, 0.5)
+        max_ppf = opt.brentq(lambda x: 1 / obj.pdf(obj.ppf(x)) - max_derivative, 0.5, 0.99)
 
         # for the cdf
         min_cdf = obj.ppf(min_ppf)
         max_cdf = obj.ppf(max_ppf)
-        xx = np.linspace(min_cdf,max_cdf,prec)
-        bounds_cdf=(xx[6],xx[-7])
+        xx = np.linspace(min_cdf, max_cdf, prec)
+        bounds_cdf = (xx[6], xx[-7])
 
-        yy = list(map(obj.cdf,xx))
-        bounds_ppf=(yy[6],yy[-7])
+        yy = list(map(obj.cdf, xx))
+        bounds_ppf = (yy[6], yy[-7])
 
-        ppf_estimate = interp1d(yy,xx,kind=method,assume_sorted=True)
-        cdf_estimate = interp1d(xx,yy,kind=method,assume_sorted=True)
+        ppf_estimate = interp1d(yy, xx, kind=method, assume_sorted=True)
+        cdf_estimate = interp1d(xx, yy, kind=method, assume_sorted=True)
 
         def ppf(x):
-            is_list = np.ndim(x)>0
+            is_list = np.ndim(x) > 0
             if is_list:
-                if len(x) ==1:
-                    x=x[0]
+                if len(x) == 1:
+                    x = x[0]
                     is_list = False
 
             if not is_list:
@@ -270,10 +270,10 @@ class fast_stats(object):
                 return obj.ppf(x)
 
         def cdf(x):
-            is_list = np.ndim(x)>0
+            is_list = np.ndim(x) > 0
             if is_list:
-                if len(x) ==1:
-                    x=x[0]
+                if len(x) == 1:
+                    x = x[0]
                     is_list = False
 
             if not is_list:
@@ -284,13 +284,14 @@ class fast_stats(object):
             else:
                 return obj.cdf(x)
 
-        zz = list(map(obj.pdf,xx))
-        pdf_estimate = interp1d(xx,zz,kind=method,assume_sorted=True)
+        zz = list(map(obj.pdf, xx))
+        pdf_estimate = interp1d(xx, zz, kind=method, assume_sorted=True)
+
         def pdf(x):
-            is_list = np.ndim(x)>0
+            is_list = np.ndim(x) > 0
             if is_list:
-                if len(x) ==1:
-                    x=x[0]
+                if len(x) == 1:
+                    x = x[0]
                     is_list = False
 
             if not is_list:
@@ -301,31 +302,31 @@ class fast_stats(object):
             else:
                 return obj.pdf(x)
 
-        self.obj=obj
-        self.ppf=ppf
-        self.cdf=cdf
-        self.pdf=pdf
+        self.obj = obj
+        self.ppf = ppf
+        self.cdf = cdf
+        self.pdf = pdf
+
 
 ### finds the quantiles of a function that returns the CDF value of different points
-def simultaneous_quantile(f,obs,epsilon=1e-7,prec=1e-7):
-
-    nb_iter=int(np.ceil(-np.log(prec)/np.log(2)))
-    length=len(obs)
-    floor_obs=np.array([epsilon]*length)
-    width=1-2*epsilon
+def simultaneous_quantile(f, obs, epsilon=1e-7, prec=1e-7):
+    nb_iter = int(np.ceil(-np.log(prec) / np.log(2)))
+    length = len(obs)
+    floor_obs = np.array([epsilon] * length)
+    width = 1 - 2 * epsilon
 
     def zerone(x):
-        if x>0:
+        if x > 0:
             return 1
         else:
             return 0
 
     for i in range(nb_iter):
-        width=width/2
-        values=f(floor_obs+width)
-        floor_obs=np.array([zerone(j[2]-j[0])*width+j[1] for j in zip(*[values,floor_obs,obs])])
+        width = width / 2
+        values = f(floor_obs + width)
+        floor_obs = np.array([zerone(j[2] - j[0]) * width + j[1] for j in zip(*[values, floor_obs, obs])])
 
-    return floor_obs+width/2
+    return floor_obs + width / 2
 
 
 # ------------------------------ utils for data handling ------------------------------------------------
@@ -350,7 +351,7 @@ def remove_in_list(l, k, when=[], reverse=False):
     for i in range(nblists):
         if len(l[i]) != length:
             print('first argument\'s childs must of same length than second argument (num %i: %d, 2nd arg: %d)' % (
-            i, len(l[i]), length))
+                i, len(l[i]), length))
             return -1
     res = [[] for i in range(nblists)]
     while True:
@@ -395,13 +396,13 @@ def is_list_of(l, child=int):
 #   () length (length of the elements of vects)
 #   () format (boolean value)
 def good_format(vects):
-    length=-1
-    format=np.ndim(vects)==2
+    length = -1
+    format = np.ndim(vects) == 2
     if format:
-        format&=len(vects)>0
+        format &= len(vects) > 0
     if format:
-        length=len(vects[0])
-    return length,format
+        length = len(vects[0])
+    return length, format
 
 
 ### recursively maps a function on the leaves of an n-dimensional array
@@ -559,46 +560,45 @@ def plot(points, noTranspose=False):
 
 
 ### plots the values of a function on a given interval
-def curve3d(f,inter1=[0,1],inter2=[0,1],points=True,nb=25,title=''):
-    xx=[(inter1[1]-inter1[0])*(i%nb+0.5)/nb+inter1[0] for i in range(nb**2)]
-    yy=[(inter2[1]-inter2[0])*(i//nb+0.5)/nb+inter2[0] for i in range(nb**2)]
+def curve3d(f, inter1=[0, 1], inter2=[0, 1], points=True, nb=25, title=''):
+    xx = [(inter1[1] - inter1[0]) * (i % nb + 0.5) / nb + inter1[0] for i in range(nb ** 2)]
+    yy = [(inter2[1] - inter2[0]) * (i // nb + 0.5) / nb + inter2[0] for i in range(nb ** 2)]
     if points:
-        zz=list(map(f,list(zip(*[xx,yy]))))
+        zz = list(map(f, list(zip(*[xx, yy]))))
     else:
-        zz=f([xx,yy])
+        zz = f([xx, yy])
 
-    print("%r , %r, %r"%(xx,yy,zz))
-    print("%r , %r, %r"%(len(xx),len(yy),len(zz)))
+    print("%r , %r, %r" % (xx, yy, zz))
+    print("%r , %r, %r" % (len(xx), len(yy), len(zz)))
     # plot 3d
-    fig=plt.figure()
-    ax=fig.add_subplot(111,projection='3d')
-    ax.plot_trisurf(xx,yy,zz)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot_trisurf(xx, yy, zz)
     plt.title(title)
 
     # contours
-    m=[zz[i*nb:(i+1)*nb] for i in range(nb)]
+    m = [zz[i * nb:(i + 1) * nb] for i in range(nb)]
     plt.figure()
     # plt.contour(m)
-    plt.contourf(m,100)
+    plt.contourf(m, 100)
     plt.title(title)
-
 
 
 ### plots the values of a function on a given interval
-def curve(f, inter=[0,1],title='',labels=[],nb=100):
-    if np.ndim(f)==1:
-        funcs=f
+def curve(f, inter=[0, 1], title='', labels=[], nb=100):
+    if np.ndim(f) == 1:
+        funcs = f
     else:
-        funcs=[f]
-    if type(labels)==str:
-        labels=[labels]
-    x = [i*(inter[1]-inter[0])/ nb +inter[0] for i in range(nb+1)]
+        funcs = [f]
+    if type(labels) == str:
+        labels = [labels]
+    x = [i * (inter[1] - inter[0]) / nb + inter[0] for i in range(nb + 1)]
     plt.figure()
     plt.title(title)
-    if len(funcs)==len(labels):
-        for ff in zip(*[funcs,labels]):
+    if len(funcs) == len(labels):
+        for ff in zip(*[funcs, labels]):
             y = [ff[0](i) for i in x]
-            plt.plot(x, y,label=ff[1])
+            plt.plot(x, y, label=ff[1])
         plt.legend()
     else:
         for ff in funcs:
@@ -607,102 +607,99 @@ def curve(f, inter=[0,1],title='',labels=[],nb=100):
 
 
 ### This function prints a table in latex language
-def table_latex(l,xlabels=None,ylabels=None,title=None):
-    if type(l[0])==dict:
-        keys=list(l[0].keys())
-        l=[[line[k] for k in keys] for line in l]
-        temp=keys
+def table_latex(l, xlabels=None, ylabels=None, title=None):
+    if type(l[0]) == dict:
+        keys = list(l[0].keys())
+        l = [[line[k] for k in keys] for line in l]
+        temp = keys
         if xlabels is not None:
-            if type(xlabels)==dict:
-                temp=[xlabels[k] for k in keys]
-        xlabels=temp
+            if type(xlabels) == dict:
+                temp = [xlabels[k] for k in keys]
+        xlabels = temp
 
-    hei=len(l)
-    wid=len(l[0])
+    hei = len(l)
+    wid = len(l[0])
 
     if ylabels is not None:
-        if len(ylabels)!=hei:
+        if len(ylabels) != hei:
             print('wrong length for \'ylabels\' ')
-            ylabels=None
+            ylabels = None
 
     if xlabels is not None:
-        if len(xlabels)!=wid:
+        if len(xlabels) != wid:
             print('wrong length for \'xlabels\' ')
-            xlabels=None
+            xlabels = None
 
-
-    text='\n\n\\begin{center}\n'
+    text = '\n\n\\begin{center}\n'
     if title is not None:
-        text='%s\\textbf{%s}\\\\ \n\\ \\\\ \n'%(text,title)
-    text='%s\\begin{tabular}{||'%text
+        text = '%s\\textbf{%s}\\\\ \n\\ \\\\ \n' % (text, title)
+    text = '%s\\begin{tabular}{||' % text
 
     if ylabels is not None:
-        text='%s c |'%text
+        text = '%s c |' % text
 
     for i in range(wid):
-        text='%s c '%text
-    text='%s||}\n'%text
-    text+='\\hline\n\\hline\n'
-
+        text = '%s c ' % text
+    text = '%s||}\n' % text
+    text += '\\hline\n\\hline\n'
 
     if xlabels is not None:
         if ylabels is not None:
-            text='%s&'%text
+            text = '%s&' % text
         for el in xlabels:
-            text='%s \\textbf{%s} & '%(text,el)
-        text='%s \\\\ \n'%text[:-1]
-        text+='\\hline\n'
+            text = '%s \\textbf{%s} & ' % (text, el)
+        text = '%s \\\\ \n' % text[:-1]
+        text += '\\hline\n'
 
     for line in range(hei):
         if ylabels is not None:
-            text='%s\\textbf{%s} & '%(text,ylabels[line])
+            text = '%s\\textbf{%s} & ' % (text, ylabels[line])
         for el in l[line]:
-            if np.ndim(el)==1|(type(el)==set):
-                text+='('
+            if np.ndim(el) == 1 | (type(el) == set):
+                text += '('
                 for el_child in el:
-                    text='%s %s,'%(text,el_child)
-                text='%s) & '%text[:-1]
+                    text = '%s %s,' % (text, el_child)
+                text = '%s) & ' % text[:-1]
             else:
-                text='%s%s & '%(text,el)
-        text='%s \\\\ \n'%text[:-1]
-    text='%s\\hline\n\\hline\n\\end{tabular} \n\\end{center}\n\n'%text
+                text = '%s%s & ' % (text, el)
+        text = '%s \\\\ \n' % text[:-1]
+    text = '%s\\hline\n\\hline\n\\end{tabular} \n\\end{center}\n\n' % text
     print(text)
     return text
 
 
 ### This method plots a bar-plot in wich the values are in increasing order (it sorts xlabels as well)
-def sorted_barplot(val,title=None,xlabels=None, min_zero=False):
-
+def sorted_barplot(val, title=None, xlabels=None, min_zero=False):
     if xlabels is not None:
-        wid=max([len(i) for i in xlabels])/10*len(val)
+        wid = max([len(i) for i in xlabels]) / 10 * len(val)
     else:
-        wid=9
+        wid = 9
 
     if min_zero:
-        m=min(val)
-        val=[i-m for i in val]
+        m = min(val)
+        val = [i - m for i in val]
 
-    if type(val)==dict:
-        keys=list(val.keys())
-        val=[val[k] for k in keys]
-        temp=keys
+    if type(val) == dict:
+        keys = list(val.keys())
+        val = [val[k] for k in keys]
+        temp = keys
         if xlabels is not None:
-            if type(xlabels)==dict:
-                temp=[xlabels[k] for k in keys]
-        xlabels=temp
+            if type(xlabels) == dict:
+                temp = [xlabels[k] for k in keys]
+        xlabels = temp
 
+    xvalues = list(range(len(val)))
+    indices = sorted(xvalues, key=val.__getitem__)
+    val_bis = list(map(val.__getitem__, indices))
+    xlabels_bis = list(map(xlabels.__getitem__, indices))
 
-    xvalues=list(range(len(val)))
-    indices=sorted(xvalues,key=val.__getitem__)
-    val_bis=list(map(val.__getitem__,indices))
-    xlabels_bis=list(map(xlabels.__getitem__,indices))
-
-    plt.figure(figsize=(wid,6))
+    plt.figure(figsize=(wid, 6))
     if title is not None:
         plt.title(title)
-    plt.bar(xvalues,val_bis)
-    plt.xticks(np.array(xvalues) + 0.4,xlabels_bis)
+    plt.bar(xvalues, val_bis)
+    plt.xticks(np.array(xvalues) + 0.4, xlabels_bis)
     rcParams.update({'font.size': 9})
+
 
 # ------------------------------ for distributions estimates -----------------------------------------------------------
 
@@ -710,11 +707,18 @@ def sorted_barplot(val,title=None,xlabels=None, min_zero=False):
 def create_gaussian_density(vects):
     dim = len(vects)
     covariance = np.cov(vects)
-    means = np.mean(vects,axis=1)
-    pdf = stats.multivariate_normal(mean=means, cov=covariance).pdf
+    means = np.mean(vects, axis=1)
+    cov_inv = np.linalg.inv(np.matrix(covariance))
+    fact_gau = np.sqrt(np.linalg.det(cov_inv) / (2 * math.pi) ** dim)
 
     def den_gau(vec):
-        return pdf(zip(*vec)).tolist()
+        if type(vec[0]) in {int, np.float, float, np.int}:
+            vec = [[j] for j in vec]
+        res = []
+        for j in zip(*vec):
+            j = np.matrix(j)
+            res.append(fact_gau * math.exp(-(j - means) * cov_inv * np.transpose(j - means) / 2))
+        return res
 
     return den_gau
 
@@ -905,43 +909,40 @@ def kernel_estimate(vects, func=None, K=10):
 
 
 ### return the expectancy and variance of a non stationary time-serie at a given moment
-def weighted_moments(obs,band_width=20):
+def weighted_moments(obs, band_width=20):
+    band_width = int(band_width)
 
-    band_width=int(band_width)
-
-    length=len(obs)
-    weights=[math.exp(-x*2/band_width**2) for x in range(-3*band_width+1,3*band_width)]
-    E=[] # expectancy
-    V=[] # variance
+    length = len(obs)
+    weights = [math.exp(-x * 2 / band_width ** 2) for x in range(-3 * band_width + 1, 3 * band_width)]
+    E = []  # expectancy
+    V = []  # variance
 
     for i in range(length):
-        weight_sum=0
-        weight_square_sum=0
-        E_temp=0
-        V_temp=0
-        for j in range(-band_width+1,band_width):
-            if not 0<=i+j<length:
+        weight_sum = 0
+        weight_square_sum = 0
+        E_temp = 0
+        V_temp = 0
+        for j in range(-band_width + 1, band_width):
+            if not 0 <= i + j < length:
                 continue
-            w=weights[j]
-            obs_el=obs[i+j]
-            weight_sum+=w
-            weight_square_sum+=w**2
-            E_temp+=obs_el*w
-            V_temp+=obs_el**2*w
+            w = weights[j]
+            obs_el = obs[i + j]
+            weight_sum += w
+            weight_square_sum += w ** 2
+            E_temp += obs_el * w
+            V_temp += obs_el ** 2 * w
 
-        E_temp/=weight_sum
-        V_temp-=weight_sum*E_temp**2
-        V_temp*=weight_sum/(weight_sum**2-weight_square_sum)
+        E_temp /= weight_sum
+        V_temp -= weight_sum * E_temp ** 2
+        V_temp *= weight_sum / (weight_sum ** 2 - weight_square_sum)
 
         E.append(E_temp)
         V.append(V_temp)
 
-    return E,V
+    return E, V
 
 
-
-
-#-------------------------------- for distances btw distributions -----------------------------------------------------
+# -------------------------------- for distances btw distributions -----------------------------------------------------
 
 """
 # Returns a float:
@@ -978,6 +979,7 @@ def compute_distance_emd(a1, a2, b1, b2, precision=10):
         sb[index] = sb[index] + invb
     return emd(sa, sb, distance)
 """
+
 
 ### uses a plugin to compute the emd (earth mover distance) between two lists of coordinate lists
 def compute_emd(v1, v2, norm=2):
@@ -1100,148 +1102,147 @@ def compute_distance_l(unif1, unif2, precision=30, rand=False, norm=2):
 
 
 ### returns the log likelihood of vect1,
-def emp_log_likelihood(vect1,vect2,density1=None,density2=None,visualize=False):
-    dim,dim2=len(vect1),len(vect2)
-    if (dim!=dim2)|(dim<1):
-        raise(RuntimeError('the dimensions of the distributions must be equal and superior than 0'))
-    def aux(vec1,vec2,den):
-        len1,len2=len(vec1[0]),len(vec2[0])
+def emp_log_likelihood(vect1, vect2, density1=None, density2=None, visualize=False):
+    dim, dim2 = len(vect1), len(vect2)
+    if (dim != dim2) | (dim < 1):
+        raise (RuntimeError('the dimensions of the distributions must be equal and superior than 0'))
+
+    def aux(vec1, vec2, den):
+        len1, len2 = len(vec1[0]), len(vec2[0])
         if den is None:
-            kde=stats.gaussian_kde(vec1)
-            res=0
+            kde = stats.gaussian_kde(vec1)
+            res = 0
             for pt in list(zip(*vec2)):
-                res+=math.log(kde(pt))
+                res += math.log(kde(pt))
         else:
             print(vec2)
-            den_list=den(vec2)
+            den_list = den(vec2)
             print(den_list)
-            res=np.sum(list(map(math.log,den_list)))
-        res/=len2
+            res = np.sum(list(map(math.log, den_list)))
+        res /= len2
         return res
 
-    a,b=aux(vect1,vect2,density1),aux(vect2,vect1,density2)
-    return ((a+b)/2,a,b)
+    a, b = aux(vect1, vect2, density1), aux(vect2, vect1, density2)
+    return ((a + b) / 2, a, b)
 
 
 ### returns the projection of vectors along axis [1,1..1],[-1,1,..1],[1,-1,..,1] etc as a list of lists
 # arguments:
 #   () copula: if True, it supposes that vects are uniforms and makes it so that the projections are in (0,1)
-def tail_projection(vects,copula=True):
-    dim=len(vects)
+def tail_projection(vects, copula=True):
+    dim = len(vects)
 
-    nb_axes=2**(dim-1)
+    nb_axes = 2 ** (dim - 1)
 
-    res=[]
-    axis=[-1 for i in range(dim)]
-    axis[-1]=1
-    denom=np.sqrt(2)**(dim)
+    res = []
+    axis = [-1 for i in range(dim)]
+    axis[-1] = 1
+    denom = np.sqrt(2) ** (dim)
 
     for i in range(nb_axes):
-        temp=[]
-        starting_corner=[(1-j)/2 for j in axis]
+        temp = []
+        starting_corner = [(1 - j) / 2 for j in axis]
         if copula:
-            offset=np.dot(starting_corner,axis)/denom
+            offset = np.dot(starting_corner, axis) / denom
         else:
-            offset=0
+            offset = 0
 
         for pt in zip(*vects):
-            value=np.dot(list(pt),axis)/denom-offset
+            value = np.dot(list(pt), axis) / denom - offset
             temp.append(value)
         res.append(temp)
 
-        axis=table_increment(axis,mi=-1,ma=3,incr=2,start=0)
+        axis = table_increment(axis, mi=-1, ma=3, incr=2, start=0)
 
     return res
+
 
 ### returns the EMD (earth-mover-distance) between the first and last quantile of two list of points.
 # vec1 and vec2 need not have the same length
-def univariate_EMD_in_tails(vec1,vec2,quantile=0.1):
-    a=sorted(vec1)
-    b=sorted(vec2)
+def univariate_EMD_in_tails(vec1, vec2, quantile=0.1):
+    a = sorted(vec1)
+    b = sorted(vec2)
 
-    nb_a=max(int(len(a)*quantile),1)
-    nb_b=max(int(len(b)*quantile),1)
+    nb_a = max(int(len(a) * quantile), 1)
+    nb_b = max(int(len(b) * quantile), 1)
 
-    factor=nb_a/nb_b
+    factor = nb_a / nb_b
 
-    remains=[1,factor]
-    it_a=iter(a[:nb_a])
-    it_b=iter(b[:nb_b])
-    current=[next(it_a),next(it_b)]
+    remains = [1, factor]
+    it_a = iter(a[:nb_a])
+    it_b = iter(b[:nb_b])
+    current = [next(it_a), next(it_b)]
 
-    res=[0,0]
+    res = [0, 0]
     try:
         while True:
 
-            if remains[0]<remains[1]:
-                res[0]+=abs(current[0]-current[1])*remains[0]
-                current[0]=next(it_a)
-                remains[1]-=remains[0]
-                remains[0]=1
+            if remains[0] < remains[1]:
+                res[0] += abs(current[0] - current[1]) * remains[0]
+                current[0] = next(it_a)
+                remains[1] -= remains[0]
+                remains[0] = 1
             else:
-                res[0]+=abs(current[0]-current[1])*remains[1]
-                current[1]=next(it_b)
-                remains[0]-=remains[1]
-                remains[1]=factor
+                res[0] += abs(current[0] - current[1]) * remains[1]
+                current[1] = next(it_b)
+                remains[0] -= remains[1]
+                remains[1] = factor
     except StopIteration:
         pass
 
-    remains=[1,factor]
-    it_a=iter(a[-nb_a:])
-    it_b=iter(b[-nb_b:])
-    current=[next(it_a),next(it_b)]
+    remains = [1, factor]
+    it_a = iter(a[-nb_a:])
+    it_b = iter(b[-nb_b:])
+    current = [next(it_a), next(it_b)]
 
     try:
         while True:
 
-            if remains[0]<remains[1]:
-                res[1]+=abs(current[0]-current[1])*remains[0]
-                current[0]=next(it_a)
-                remains[1]-=remains[0]
-                remains[0]=1
+            if remains[0] < remains[1]:
+                res[1] += abs(current[0] - current[1]) * remains[0]
+                current[0] = next(it_a)
+                remains[1] -= remains[0]
+                remains[0] = 1
             else:
-                res[1]+=abs(current[0]-current[1])*remains[1]
-                current[1]=next(it_b)
-                remains[0]-=remains[1]
-                remains[1]=factor
+                res[1] += abs(current[0] - current[1]) * remains[1]
+                current[1] = next(it_b)
+                remains[0] -= remains[1]
+                remains[1] = factor
     except StopIteration:
         pass
 
-
-    res=[i/nb_a for i in res]
+    res = [i / nb_a for i in res]
 
     return res
 
+
 ### returns the EMD distance between the projections of simulations items and past_obs
 ### also returns the quantile of the projections of obs as compared to the projections of simulations items
-def compare_tails(simulations,past_obs,obs,quantile=0.1,visualize=False):
+def compare_tails(simulations, past_obs, obs, quantile=0.1, visualize=False):
+    proj_past_obs = tail_projection(past_obs)
+    proj_obs = tail_projection([[i] for i in obs])
 
-    proj_past_obs=tail_projection(past_obs)
-    proj_obs=tail_projection([[i] for i in obs])
-
-    fit=[]
-    rank=[]
+    fit = []
+    rank = []
 
     for sim in simulations:
 
-        proj_tp=tail_projection(sim)
-        fit_tp=[]
-        for i in zip(*[proj_past_obs,proj_tp]):
-            fit_tp.append(univariate_EMD_in_tails(i[0],i[1],quantile=quantile))
+        proj_tp = tail_projection(sim)
+        fit_tp = []
+        for i in zip(*[proj_past_obs, proj_tp]):
+            fit_tp.append(univariate_EMD_in_tails(i[0], i[1], quantile=quantile))
             if visualize:
-                curve(stats.gaussian_kde(i[1]),inter=[-1000,1000])
+                curve(stats.gaussian_kde(i[1]), inter=[-1000, 1000])
 
         fit.append(fit_tp)
 
-        rank_tp=[]
+        rank_tp = []
         for i in range(len(proj_obs)):
             rank_tp.append(empirical_CDF_scalar(proj_tp[i])(proj_obs[i][0]))
 
         rank.append(rank_tp)
 
-
-    return fit,rank
-
+    return fit, rank
 
 
 # ------------------------------ for distributions: others -----------------------------------------------------------
@@ -1285,7 +1286,7 @@ def pearson_with_holes(vects, hole=None):
                 if (k[0] != hole) & (k[1] != hole):
                     vec_bis.append(k)
                     incr += 1
-            if len(vec_bis)>1:
+            if len(vec_bis) > 1:
                 vec_bis = list(zip(*vec_bis))
                 for a in [0, 1]:
 
@@ -1296,7 +1297,7 @@ def pearson_with_holes(vects, hole=None):
                 cov = np.cov(vec_bis)
                 res[i, j] = cov[0, 1] / math.sqrt(cov[0, 0] * cov[1, 1])
             else:
-                res[i,j]=0
+                res[i, j] = 0
             res[j, i] = res[i, j]
 
     return res
@@ -1306,23 +1307,24 @@ def pearson_with_holes(vects, hole=None):
 # arguments:
 #   () pdf: function: [a,b] -> [pdf(a,b)]
 #   () mi,ma: min and max bounds
-def test_pdf(pdf,mi=-1000,ma=1000,prec=30,scalar=None):
-    s=0
+def test_pdf(pdf, mi=-1000, ma=1000, prec=30, scalar=None):
+    s = 0
 
     if scalar is None:
-        scalar=False
-        if type(pdf([(ma-mi)/2,(ma-mi)/2])) in {float,np.float}:
-            scalar=True
+        scalar = False
+        if type(pdf([(ma - mi) / 2, (ma - mi) / 2])) in {float, np.float}:
+            scalar = True
 
-    fact=(ma-mi)/prec
+    fact = (ma - mi) / prec
     for i in range(prec):
         for j in range(prec):
             if scalar:
-                s+=pdf([(i+0.5)*fact+mi,(j+0.5)*fact+mi])
+                s += pdf([(i + 0.5) * fact + mi, (j + 0.5) * fact + mi])
             else:
-                s+=pdf([(i+0.5)*fact+mi,(j+0.5)*fact+mi])[0]
-    s*=fact**2
+                s += pdf([(i + 0.5) * fact + mi, (j + 0.5) * fact + mi])[0]
+    s *= fact ** 2
     return s
+
 
 # ------------------------------ for marginals ------------------------------------------------------------------------
 
@@ -1330,37 +1332,37 @@ def test_pdf(pdf,mi=-1000,ma=1000,prec=30,scalar=None):
 
 # finds quantiles, given a CDF
 # l is the list specifying the desired quantiles
-def find_quantiles(cdf,l,start=0,step=0.1,precision=0.00001):
-    max_iter=1000
-    res=[]
-    cur=start
-    length=len(l)
-    ind=sorted(range(length),key=l.__getitem__)
-    ordered_quantiles = list(map(l.__getitem__,ind))
+def find_quantiles(cdf, l, start=0, step=0.1, precision=0.00001):
+    max_iter = 1000
+    res = []
+    cur = start
+    length = len(l)
+    ind = sorted(range(length), key=l.__getitem__)
+    ordered_quantiles = list(map(l.__getitem__, ind))
 
     for i in ordered_quantiles:
-        cur_step=step
-        while cdf(cur)<i:
-            cur+=cur_step
-        while cdf(cur)>i:
-            cur-=cur_step
-        diff=1
-        inter=[cur,cur+step]
-        incr=0
-        while (incr<max_iter)&(abs(diff)>precision):
-            incr+=1
-            cur=(inter[0]+inter[1])/2
-            diff=i-cdf(cur)
-            if diff>0:
-                inter=[cur,inter[1]]
+        cur_step = step
+        while cdf(cur) < i:
+            cur += cur_step
+        while cdf(cur) > i:
+            cur -= cur_step
+        diff = 1
+        inter = [cur, cur + step]
+        incr = 0
+        while (incr < max_iter) & (abs(diff) > precision):
+            incr += 1
+            cur = (inter[0] + inter[1]) / 2
+            diff = i - cdf(cur)
+            if diff > 0:
+                inter = [cur, inter[1]]
             else:
-                inter=[inter[0],cur]
+                inter = [inter[0], cur]
         res.append(cur)
-        if incr>=max_iter:
+        if incr >= max_iter:
             print('max number of iteration reached')
 
-    ind_inverse = sorted(range(length),key=ind.__getitem__)
-    result=list(map(res.__getitem__,ind_inverse))
+    ind_inverse = sorted(range(length), key=ind.__getitem__)
+    result = list(map(res.__getitem__, ind_inverse))
 
     return result
 
@@ -1369,180 +1371,187 @@ def find_quantiles(cdf,l,start=0,step=0.1,precision=0.00001):
 # if exp_tails, fits an exponential function at the extremities
 def empirical_CDF_scalar(obs, exp_tails=True, mi=None, ma=None):
     # an auxiliar function: doesn't take min  or max bounds
-    def aux(obs,exp_tails=False):
-        length=len(obs)
-        wei=[]  # cdf difference between current and previous point
-        pts=[]  # points without doubles
-        store=0
-        first=True
+    def aux(obs, exp_tails=False):
+        length = len(obs)
+        wei = []  # cdf difference between current and previous point
+        pts = []  # points without doubles
+        store = 0
+        first = True
         for i in sorted(obs):
             if first:
                 pts.append(i)
                 wei.append(1)
-                first=False
+                first = False
             else:
-                if i==pts[-1]:
-                    wei[-1]+=0.5
-                    store+=0.5
+                if i == pts[-1]:
+                    wei[-1] += 0.5
+                    store += 0.5
                 else:
                     pts.append(i)
-                    wei.append(1+store)
-                    store=0
+                    wei.append(1 + store)
+                    store = 0
 
-        wei=[i/(length+1) for i in wei]
-        cum_wei=np.cumsum(wei) # cdf value of the point
+        wei = [i / (length + 1) for i in wei]
+        cum_wei = np.cumsum(wei)  # cdf value of the point
+
         # print(wei)
         # print(pts)
         # print(cum_wei)
 
         def f(x):
-            ind=int(np.searchsorted(pts,x))
+            ind = int(np.searchsorted(pts, x))
 
-            if ind==0:
+            if ind == 0:
                 if exp_tails:
                     # exponential tail with matching derivative
-                    return wei[0]*math.exp(  -(pts[0]-x)*wei[1]  /  (wei[0]*(pts[1]-pts[0]))  )
+                    return wei[0] * math.exp(-(pts[0] - x) * wei[1] / (wei[0] * (pts[1] - pts[0])))
                 else:
                     # linear tail with matching derivative
-                    return max(0  ,  wei[0]*(1 - (pts[0]-x)*wei[1] / (wei[0]*(pts[1]-pts[0])) ))
-            elif ind==len(pts):
+                    return max(0, wei[0] * (1 - (pts[0] - x) * wei[1] / (wei[0] * (pts[1] - pts[0]))))
+            elif ind == len(pts):
                 if exp_tails:
-                    return 1-(1-cum_wei[-1])*math.exp(- (x-pts[-1])*wei[-1]  /  ((1-cum_wei[-1])*(pts[-1]-pts[-2])))
-                return min(1, 1- (1-cum_wei[-1])*(1 - (x-pts[-1])*wei[-1]  /  ((1-cum_wei[-1])*(pts[-1]-pts[-2])) ))
+                    return 1 - (1 - cum_wei[-1]) * math.exp(
+                        - (x - pts[-1]) * wei[-1] / ((1 - cum_wei[-1]) * (pts[-1] - pts[-2])))
+                return min(1, 1 - (1 - cum_wei[-1]) * (
+                1 - (x - pts[-1]) * wei[-1] / ((1 - cum_wei[-1]) * (pts[-1] - pts[-2]))))
             else:
-                a=(x-pts[ind-1])/(pts[ind]-pts[ind-1])
-                return cum_wei[ind-1]*(1-a)  +  cum_wei[ind]*a
+                a = (x - pts[ind - 1]) / (pts[ind] - pts[ind - 1])
+                return cum_wei[ind - 1] * (1 - a) + cum_wei[ind] * a
+
         return f
 
-
-
-    bi,ba=(mi is not None),(ma is not None)
-    length=len(obs)
+    bi, ba = (mi is not None), (ma is not None)
+    length = len(obs)
 
     if bi:
-        if mi>min(obs):
-            raise(RuntimeError('minimum given (%f) is higher than some observations (%f)'%(mi,min(obs))))
+        if mi > min(obs):
+            raise (RuntimeError('minimum given (%f) is higher than some observations (%f)' % (mi, min(obs))))
     if ba:
-        if ma<max(obs):
-            raise(RuntimeError('maximum given (%f) is lower than some observations (%f)'%(ma,max(obs))))
-    if len(set(obs))<2:
-        raise(RuntimeError('impossible to compute a CDF with less than 2 points'))
+        if ma < max(obs):
+            raise (RuntimeError('maximum given (%f) is lower than some observations (%f)' % (ma, max(obs))))
+    if len(set(obs)) < 2:
+        raise (RuntimeError('impossible to compute a CDF with less than 2 points'))
 
     # taking min and max into account
-    if bi|ba:
-        obs_bis=[]
+    if bi | ba:
+        obs_bis = []
         if bi:
             obs_bis.append(mi)
         obs_bis.extend(obs)
         if ba:
             obs_bis.append(ma)
-        g=aux(obs_bis)
+        g = aux(obs_bis)
+
         def f(x):
             if bi:
-                if(x<mi):
+                if (x < mi):
                     return 0
             if ba:
-                if (x>ma):
+                if (x > ma):
                     return 1
 
             # creating linear CDF with two added observations: mi and ma
-            res=g(x)
+            res = g(x)
             # normalizing the interpolation to get 0 at mi and 1 at ma (unless doubles)
             if bi:
-                res-=1/(len(obs_bis)+1)
-            res*=(len(obs_bis)+1)/(len(obs)+1)
+                res -= 1 / (len(obs_bis) + 1)
+            res *= (len(obs_bis) + 1) / (len(obs) + 1)
             return res
+
         return f
 
     # no min and max given
     else:
-        return aux(obs,exp_tails=exp_tails)
+        return aux(obs, exp_tails=exp_tails)
+
 
 # returns the inverse of a cdf function, given a list of observations
 # if log_tails, fits a log function at the extremities
 # (this is the almost exact inverse of the previous)
 def empirical_CDF_inv(obs, log_tails=True, mi=None, ma=None):
     # an auxiliar function: doesn't take min  or max bounds
-    def aux(obs,log_tails=False):
-        length=len(obs)
-        wei=[]  # cdf difference between current and previous point
-        pts=[]  # points without doubles
-        store=0
-        first=True
+    def aux(obs, log_tails=False):
+        length = len(obs)
+        wei = []  # cdf difference between current and previous point
+        pts = []  # points without doubles
+        store = 0
+        first = True
         for i in sorted(obs):
             if first:
                 pts.append(i)
                 wei.append(1)
-                first=False
+                first = False
             else:
-                if i==pts[-1]:
-                    wei[-1]+=0.5
-                    store+=0.5
+                if i == pts[-1]:
+                    wei[-1] += 0.5
+                    store += 0.5
                 else:
                     pts.append(i)
-                    wei.append(1+store)
-                    store=0
+                    wei.append(1 + store)
+                    store = 0
 
-        wei=[i/(length+1) for i in wei]
-        cum_wei=np.cumsum(wei) # cdf value of the point
+        wei = [i / (length + 1) for i in wei]
+        cum_wei = np.cumsum(wei)  # cdf value of the point
+
         # print(wei)
         # print(pts)
         # print(cum_wei)
 
         def f(x):
-            if (x>1)|(x<0):
-                raise(RuntimeError('x should be comprised between 0 and 1'))
-            if log_tails&((x==1)|(x==0)):
-                raise(RuntimeError('x should be comprised between 0 and 1'))
+            if (x > 1) | (x < 0):
+                raise (RuntimeError('x should be comprised between 0 and 1'))
+            if log_tails & ((x == 1) | (x == 0)):
+                raise (RuntimeError('x should be comprised between 0 and 1'))
 
-            ind=int(np.searchsorted(cum_wei,x))
+            ind = int(np.searchsorted(cum_wei, x))
 
-            if ind==0:
+            if ind == 0:
                 if log_tails:
                     # log tail with matching derivative
-                    return math.log(x/wei[0])*  wei[0]*(pts[1]-pts[0])/wei[1] +pts[0]
+                    return math.log(x / wei[0]) * wei[0] * (pts[1] - pts[0]) / wei[1] + pts[0]
                 else:
                     # linear tail with matching derivative
-                    return pts[0] + (wei[0]-x)/wei[1] * (pts[0]-pts[1])
-            elif ind==len(pts):
+                    return pts[0] + (wei[0] - x) / wei[1] * (pts[0] - pts[1])
+            elif ind == len(pts):
                 if log_tails:
-                    return pts[-1]-math.log((1-x)/(1-cum_wei[-1])) / wei[-1] * ((1-cum_wei[-1])*(pts[-1]-pts[-2]))
+                    return pts[-1] - math.log((1 - x) / (1 - cum_wei[-1])) / wei[-1] * (
+                    (1 - cum_wei[-1]) * (pts[-1] - pts[-2]))
                 else:
-                    return pts[-1]+ (x-cum_wei[-1]) * (pts[-1]-pts[-2])/wei[-1]
+                    return pts[-1] + (x - cum_wei[-1]) * (pts[-1] - pts[-2]) / wei[-1]
             else:
-                a=(x-cum_wei[ind-1])/(cum_wei[ind]-cum_wei[ind-1])
-                return pts[ind-1]*(1-a)  +  pts[ind]*a
+                a = (x - cum_wei[ind - 1]) / (cum_wei[ind] - cum_wei[ind - 1])
+                return pts[ind - 1] * (1 - a) + pts[ind] * a
+
         return f
 
+    bi, ba = (mi is not None), (ma is not None)
 
-    bi,ba=(mi is not None),(ma is not None)
-
-    if len(set(obs))<2:
-        raise(RuntimeError('impossible to compute a CDF with less than 2 points'))
+    if len(set(obs)) < 2:
+        raise (RuntimeError('impossible to compute a CDF with less than 2 points'))
 
     # taking min and max into account
-    if bi|ba:
-        obs_bis=[]
+    if bi | ba:
+        obs_bis = []
         if bi:
             obs_bis.append(mi)
         obs_bis.extend(obs)
         if ba:
             obs_bis.append(ma)
-        g=aux(obs_bis)
-        length_bis=(len(obs_bis)+1)
-        ratio=(len(obs)+1)/length_bis
+        g = aux(obs_bis)
+        length_bis = (len(obs_bis) + 1)
+        ratio = (len(obs) + 1) / length_bis
 
         def f(x):
-            x_bis=x*ratio
+            x_bis = x * ratio
             if bi:
-                x_bis+=1/length_bis
+                x_bis += 1 / length_bis
             return g(x_bis)
 
         return f
 
     # no min and max given
     else:
-        return aux(obs,log_tails=log_tails)
+        return aux(obs, log_tails=log_tails)
 
 
 ### returns a function that computes the approximate CDFs (cumulative density functions) of the marginals of a distribution.
@@ -1556,8 +1565,8 @@ def marginals_cdf(vects, seg_N=10, interpolate='linear'):
     res = []
     dim = len(vects)
     if dim == 0:
-        raise(RuntimeError('dimension of array must be >0'))
-    if interpolate=='epi-spline':
+        raise (RuntimeError('dimension of array must be >0'))
+    if interpolate == 'epi-spline':
         bins = 32
         for i in range(dim):
             h = np.histogram(vects[i], bins=bins)
@@ -1606,7 +1615,7 @@ def marginals_cdf(vects, seg_N=10, interpolate='linear'):
                 res.append(temp)
     else:
         for i in vects:
-            res.append(empirical_CDF_scalar(i,mi=-3000,ma=3000))
+            res.append(empirical_CDF_scalar(i, mi=-3000, ma=3000))
 
     return res
 
@@ -1652,15 +1661,17 @@ def marginals_cdf_inv(vects, seg_N=10, limits=None, interpolate='linear', ):  # 
             if limited:
                 def temp(a):
                     return (min(limits[1], max(limits[0], f(a * div))))
+
                 res.append(temp)
             else:
                 def temp(a):
                     return (f(a * div))
+
                 res.append(temp)
 
         else:
             if limited:
-                res.append(empirical_CDF_inv(vects[i],mi=limits[0],ma=limits[1]))
+                res.append(empirical_CDF_inv(vects[i], mi=limits[0], ma=limits[1]))
             else:
                 res.append(empirical_CDF_inv(vects[i]))
 
@@ -1668,16 +1679,16 @@ def marginals_cdf_inv(vects, seg_N=10, limits=None, interpolate='linear', ):  # 
 
 
 ### similarily, computes the marginals' PDFs
-def marginals_pdf(vects,seg_N=8,interpolate='kernel'):
-    length=len(vects[0])
+def marginals_pdf(vects, seg_N=8, interpolate='kernel'):
+    length = len(vects[0])
     bins = int(math.ceil(math.sqrt(length)))
     res = []
     dim = len(vects)
     if dim == 0:
-        raise(RuntimeError('dimension of array must be >0'))
+        raise (RuntimeError('dimension of array must be >0'))
     for i in range(dim):
 
-        if interpolate=='kernel':
+        if interpolate == 'kernel':
             res.append(stats.gaussian_kde(vects[i]))
             continue
 
@@ -1685,43 +1696,44 @@ def marginals_pdf(vects,seg_N=8,interpolate='kernel'):
         xx = []
         for j in range(bins):
             xx.append(float(h[1][j] + h[1][j + 1]) / 2)
-        norm=length*(xx[-1]-xx[0])/bins
-        yy = [i/norm for i in h[0]]
+        norm = length * (xx[-1] - xx[0]) / bins
+        yy = [i / norm for i in h[0]]
 
-        if interpolate=='epi-spline':
+        if interpolate == 'epi-spline':
             dico = find_spline(xx, yy, seg_N=seg_N, visualize=False, positiveness_constraint=True,
                                increasingness_constraint=True)
             f = create_spline(dico)
-        elif interpolate=='linear':
+        elif interpolate == 'linear':
 
             # linear interpolation with exponential tails
-            decr=bins/(xx[-1]-xx[0])
-            def f(x,xx=xx,yy=yy,decr=decr,bins=bins):
-                ind=np.searchsorted(xx,x)
-                if ind==0:
-                    return yy[0]*math.exp(-(xx[0]-x)*decr)
-                elif ind==bins:
-                    return yy[-1]*math.exp(-(x-xx[-1])*decr)
+            decr = bins / (xx[-1] - xx[0])
+
+            def f(x, xx=xx, yy=yy, decr=decr, bins=bins):
+                ind = np.searchsorted(xx, x)
+                if ind == 0:
+                    return yy[0] * math.exp(-(xx[0] - x) * decr)
+                elif ind == bins:
+                    return yy[-1] * math.exp(-(x - xx[-1]) * decr)
                 else:
-                    return (yy[ind-1]*(xx[ind]-x)+yy[ind]*(x-xx[ind-1]))/(xx[ind]-xx[ind-1])
+                    return (yy[ind - 1] * (xx[ind] - x) + yy[ind] * (x - xx[ind - 1])) / (xx[ind] - xx[ind - 1])
 
         else:
-            f=interpol_simple(xx,yy)
-            raise(RuntimeWarning('\'interpolate\' argument is not valid'))
+            f = interpol_simple(xx, yy)
+            raise (RuntimeWarning('\'interpolate\' argument is not valid'))
 
         # normalizing the pdf
-        mi,ma=min(vects[i]),max(vects[i])
-        inter_length=ma-mi
-        mi-=0.1*inter_length
-        ma+=0.1*inter_length
-        fact=(ma-mi)/(10*bins)
-        div=0
-        for i in range(10*bins):
-            div+=f(mi+(i+0.5)*fact)
-        div*=fact
+        mi, ma = min(vects[i]), max(vects[i])
+        inter_length = ma - mi
+        mi -= 0.1 * inter_length
+        ma += 0.1 * inter_length
+        fact = (ma - mi) / (10 * bins)
+        div = 0
+        for i in range(10 * bins):
+            div += f(mi + (i + 0.5) * fact)
+        div *= fact
 
-        def f_normalized(x,f=f):
-            return f(x)/div
+        def f_normalized(x, f=f):
+            return f(x) / div
 
         res.append(f_normalized)
 
@@ -1729,7 +1741,7 @@ def marginals_pdf(vects,seg_N=8,interpolate='kernel'):
 
 
 ### using previous functions, computes marginals to create distribution points from copula points
-def copula_to_distribution(vects,visualize=False):
+def copula_to_distribution(vects, visualize=False):
     dim = len(vects)
     f_inv = marginals_cdf_inv(vects)
 
@@ -1754,37 +1766,38 @@ def copula_to_distribution(vects,visualize=False):
 
 
 ### given a distribution and the densities of various copulae, returns the densities of the corresponding distributions
-def copula_to_densities(vects,densities,visualize=False,log_return=False):
-    return_list=True
+def copula_to_densities(vects, densities, visualize=False, log_return=False):
+    return_list = True
     if callable(densities):
-        return_list=False
-        densities=[densities]
-    dim=len(vects)
-    mar_pdf=marginals_pdf(vects,interpolate='kernel')
-    mar_cdf=marginals_cdf(vects,interpolate='linear')
+        return_list = False
+        densities = [densities]
+    dim = len(vects)
+    mar_pdf = marginals_pdf(vects, interpolate='kernel')
+    mar_cdf = marginals_cdf(vects, interpolate='linear')
 
     if visualize:
-        mi=min(min(vects))
-        ma=max(max(vects))
+        mi = min(min(vects))
+        ma = max(max(vects))
         for i in mar_pdf:
-            curve(i,inter=[mi,ma])
+            curve(i, inter=[mi, ma])
         for i in mar_cdf:
-            curve(i,inter=[mi,ma])
+            curve(i, inter=[mi, ma])
 
-    res=[]
+    res = []
     for i in densities:
         if i is not None:
-            def f(x,den=i,log_return=log_return):
-                if type(x[0]) in {float,int,np.float,np.int}:
-                    x=[[j] for j in x]
-                pdf=[list(map(mar_pdf[j],x[j])) for j in range(dim)]
-                cdf=[list(map(mar_cdf[j],x[j])) for j in range(dim)]
+            def f(x, den=i, log_return=log_return):
+                if type(x[0]) in {float, int, np.float, np.int}:
+                    x = [[j] for j in x]
+                pdf = [list(map(mar_pdf[j], x[j])) for j in range(dim)]
+                cdf = [list(map(mar_cdf[j], x[j])) for j in range(dim)]
                 if log_return:
-                    prod=[np.sum(list(map(math.log,j))) for j in zip(*pdf)]
-                    return [j[0]+math.log(j[1]) for j in zip(*[prod,den(cdf)])]
+                    prod = [np.sum(list(map(math.log, j))) for j in zip(*pdf)]
+                    return [j[0] + math.log(j[1]) for j in zip(*[prod, den(cdf)])]
                 else:
-                    prod=[np.prod(j) for j in zip(*pdf)]
-                    return [j[0]*j[1] for j in zip(*[prod,den(cdf)])]
+                    prod = [np.prod(j) for j in zip(*pdf)]
+                    return [j[0] * j[1] for j in zip(*[prod, den(cdf)])]
+
             res.append(f)
         else:
             res.append(None)
@@ -1797,29 +1810,30 @@ def copula_to_densities(vects,densities,visualize=False,log_return=False):
 
 ### given a distribution's observations, and a list of pdf approximates for the distribution,
 ###  returns the densities of the corresponding copula
-def distribution_to_copula_densities(vects,densities,log_return=False):
-    return_list=True
+def distribution_to_copula_densities(vects, densities, log_return=False):
+    return_list = True
     if callable(densities):
-        return_list=False
-        densities=[densities]
-    dim=len(vects)
-    mar_pdf=marginals_pdf(vects,interpolate='kernel')
-    mar_cdf_inv=marginals_cdf_inv(vects,interpolate='linear')
+        return_list = False
+        densities = [densities]
+    dim = len(vects)
+    mar_pdf = marginals_pdf(vects, interpolate='kernel')
+    mar_cdf_inv = marginals_cdf_inv(vects, interpolate='linear')
 
-    res=[]
+    res = []
     for i in densities:
         if i is not None:
-            def f(x,den=i,log_return=log_return):
-                if type(x[0]) in {float,int,np.float,np.int}:
-                    x=[[j] for j in x]
-                cdf=[list(map(mar_cdf_inv[j],x[j])) for j in range(dim)]
-                pdf=[list(map(mar_pdf[j],cdf[j])) for j in range(dim)]
+            def f(x, den=i, log_return=log_return):
+                if type(x[0]) in {float, int, np.float, np.int}:
+                    x = [[j] for j in x]
+                cdf = [list(map(mar_cdf_inv[j], x[j])) for j in range(dim)]
+                pdf = [list(map(mar_pdf[j], cdf[j])) for j in range(dim)]
                 if log_return:
-                    prod=[np.sum(list(map(math.log,j))) for j in zip(*pdf)]
-                    return [math.log(j[1])-j[0] for j in zip(*[prod,den(cdf)])]
+                    prod = [np.sum(list(map(math.log, j))) for j in zip(*pdf)]
+                    return [math.log(j[1]) - j[0] for j in zip(*[prod, den(cdf)])]
                 else:
-                    prod=[np.prod(j) for j in zip(*pdf)]
-                    return [j[1]/j[0] for j in zip(*[prod,den(cdf)])]
+                    prod = [np.prod(j) for j in zip(*pdf)]
+                    return [j[1] / j[0] for j in zip(*[prod, den(cdf)])]
+
             res.append(f)
         else:
             res.append(None)
@@ -1833,23 +1847,22 @@ def distribution_to_copula_densities(vects,densities,log_return=False):
 # returns the rank of vects.
 # If rand, it will simulate uniform points by replacing the rank by the value of the n^th point
 def uniforms(vects, rand=True):
-    length=len(vects[0])
-    res=[]
+    length = len(vects[0])
+    res = []
     for i in vects:
-        index=sorted(range(length),key=i.__getitem__)
-        if(rand):
-            unif=np.random.rand(length)
+        index = sorted(range(length), key=i.__getitem__)
+        if (rand):
+            unif = np.random.rand(length)
             unif.sort()
-            temp=[0 for j in range(length)]
+            temp = [0 for j in range(length)]
             for j in range(length):
-                temp[index[j]]=unif[j]
+                temp[index[j]] = unif[j]
             res.append(temp)
         else:
-            temp=[0 for j in range(length)]
+            temp = [0 for j in range(length)]
             for j in range(length):
-                temp[index[j]]=(1+j)/(length+1)
+                temp[index[j]] = (1 + j) / (length + 1)
             res.append(temp)
-
 
     return res
 
@@ -1857,33 +1870,31 @@ def uniforms(vects, rand=True):
 # ------------------------------ utilities for matrices ------------------------------------------------
 
 def conditional_matrix_gaussian(M):
-    res=[]
-    length=len(M)
+    res = []
+    length = len(M)
     for i in range(length):
-        m11=np.matrix(M[i,i])
-        m12=np.zeros([1,length-1])
-        m22=np.zeros([length-1,length-1])
-        inc1=0
-        for j in range(length-1):
-            if inc1==i:
-                inc1+=1
-            m12[0,j]=M[i,inc1]
-            inc2=0
-            for k in range(length-1):
-                if inc2==i:
-                    inc2+=1
-                m22[j,k]=M[inc1,inc2]
-                inc2+=1
-            inc1+=1
-        m12=np.matrix(m12)
-        m22=np.matrix(m22)
+        m11 = np.matrix(M[i, i])
+        m12 = np.zeros([1, length - 1])
+        m22 = np.zeros([length - 1, length - 1])
+        inc1 = 0
+        for j in range(length - 1):
+            if inc1 == i:
+                inc1 += 1
+            m12[0, j] = M[i, inc1]
+            inc2 = 0
+            for k in range(length - 1):
+                if inc2 == i:
+                    inc2 += 1
+                m22[j, k] = M[inc1, inc2]
+                inc2 += 1
+            inc1 += 1
+        m12 = np.matrix(m12)
+        m22 = np.matrix(m22)
 
-        print('m11: %r, \n m12: %r \n m22: %r'%(m11,m12,m22))
-        res.append(float(m11-m12*m22**(-1)*np.transpose(m12)))
+        print('m11: %r, \n m12: %r \n m22: %r' % (m11, m12, m22))
+        res.append(float(m11 - m12 * m22 ** (-1) * np.transpose(m12)))
 
     return res
-
-
 
 
 # ------------------------------ utilities for solar hour ------------------------------------------------
@@ -2023,56 +2034,55 @@ def prepare_solar(l, visualize=False):
             'var_function': inter}
 
 
-def intersect_dates(intervals,current,width,visualize=False):
-    if type(current)==str:
-        current=dt.parse(current)
-    if np.ndim(intervals[0])==0:
-        intervals=[intervals]
-    if type(intervals[0][0])==str:
-        intervals=[(dt.parse(i[0]),dt.parse(i[1])) for i in intervals]
+def intersect_dates(intervals, current, width, visualize=False):
+    if type(current) == str:
+        current = dt.parse(current)
+    if np.ndim(intervals[0]) == 0:
+        intervals = [intervals]
+    if type(intervals[0][0]) == str:
+        intervals = [(dt.parse(i[0]), dt.parse(i[1])) for i in intervals]
 
-    incr=2
+    incr = 2
     if visualize:
         plt.figure()
-        plt.plot([incr,incr+0.03,incr+.03,incr],[0,0,0.03,0.03])
+        plt.plot([incr, incr + 0.03, incr + .03, incr], [0, 0, 0.03, 0.03])
 
-
-    res=[]
+    res = []
     for i in intervals:
-        mi=(i[0]-current).days
-        ma=(i[1]-current).days
-        print(mi,ma)
+        mi = (i[0] - current).days
+        ma = (i[1] - current).days
+        print(mi, ma)
 
         if visualize:
-            plt.plot([mi,ma],[incr-1,incr-1],c='blue')
+            plt.plot([mi, ma], [incr - 1, incr - 1], c='blue')
 
-        if 0<=(mi+width)%365.25<=2*width:
-            temp=int(((mi+width)//365.25)*365.25+width)
-            res.append(( str(i[0]) , str(current+relativedelta(days=min(temp,ma))) ))
+        if 0 <= (mi + width) % 365.25 <= 2 * width:
+            temp = int(((mi + width) // 365.25) * 365.25 + width)
+            res.append((str(i[0]), str(current + relativedelta(days=min(temp, ma)))))
 
             if visualize:
-                print('1: %r'%[mi,min(temp,ma)])
-                plt.plot([mi,min(temp,ma)],[incr,incr],c='red')
-                incr+=0.1
+                print('1: %r' % [mi, min(temp, ma)])
+                plt.plot([mi, min(temp, ma)], [incr, incr], c='red')
+                incr += 0.1
 
-        if 0<=(ma+width)%365.25<=2*width:
-            temp=int(((ma+width)//365.25)*365.25-width)
-            if temp>mi:
-                res.append(( str(current+relativedelta(days=temp)) , str(i[1])  ))
+        if 0 <= (ma + width) % 365.25 <= 2 * width:
+            temp = int(((ma + width) // 365.25) * 365.25 - width)
+            if temp > mi:
+                res.append((str(current + relativedelta(days=temp)), str(i[1])))
                 if visualize:
-                    print('2: %r'%[temp,ma])
-                    plt.plot([temp,ma],[incr,incr],c='red')
-                    incr+=0.1
+                    print('2: %r' % [temp, ma])
+                    plt.plot([temp, ma], [incr, incr], c='red')
+                    incr += 0.1
 
-        for j in range( int(math.ceil((mi+width)/365.25)) , 1+int(math.floor((ma-width)/365.25)) ):
-            res.append( ( str( relativedelta(days=int(j*365.25)-width)+current) , str(relativedelta(days=int(j*365.25)+width)+current) ) )
+        for j in range(int(math.ceil((mi + width) / 365.25)), 1 + int(math.floor((ma - width) / 365.25))):
+            res.append((str(relativedelta(days=int(j * 365.25) - width) + current),
+                        str(relativedelta(days=int(j * 365.25) + width) + current)))
             if visualize:
-                print('3: %r'%[int(j*365.25)-width,int(j*365.25)+width])
-                plt.plot([int(j*365.25)-width,int(j*365.25)+width],[incr,incr],c='red')
-                incr+=0.1
+                print('3: %r' % [int(j * 365.25) - width, int(j * 365.25) + width])
+                plt.plot([int(j * 365.25) - width, int(j * 365.25) + width], [incr, incr], c='red')
+                incr += 0.1
 
     return res
-
 
 
 # dr_par=[]
@@ -2100,20 +2110,20 @@ def intersect_dates(intervals,current,width,visualize=False):
 #                     dr_par.append(int(start*365.25))
 
 
-#--------------------------------- other -------------------------------------------------------------------------------
+# --------------------------------- other -------------------------------------------------------------------------------
 
 ### this function returns a list used to go through a multidimensional grid on [mi,ma]^n, with increment 'incr
 ### When it has went through all the grid, it returns None
-def table_increment(t,mi=0,ma=2,incr=1,length=None,start=0):
+def table_increment(t, mi=0, ma=2, incr=1, length=None, start=0):
     if length is None:
-        length=len(t)
-    if t[start]+incr<ma:
-        t[start]+=incr
+        length = len(t)
+    if t[start] + incr < ma:
+        t[start] += incr
         return t
-    elif length>start+1:
-        temp=table_increment(t,mi=mi,ma=ma,incr=incr,length=length,start=start+1)
+    elif length > start + 1:
+        temp = table_increment(t, mi=mi, ma=ma, incr=incr, length=length, start=start + 1)
         if temp is not None:
-            temp[start]=mi
+            temp[start] = mi
         return temp
     else:
         return None
