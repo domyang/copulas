@@ -4,7 +4,6 @@ import sys
 import matplotlib.pyplot as plt
 import math
 import numpy as np
-from scipy import stats
 import dateutil.parser as dt
 from dateutil.relativedelta import relativedelta
 import utilities as ut
@@ -349,7 +348,7 @@ def visualize_result(res,add_title='',save=True,quantile=0.1):
     print(temp)
     ut.sorted_barplot(temp,xlabels=res['names'],title=title)
     if save:
-        plt.savefig('graphs/automatic_result/%s.png'%title.replace(' ','_').replace('\n','_'))
+        plt.savefig('%s.png'%title.replace(' ','_').replace('\n','_'))
 
     # emd comparison of the projections (FITTING)
     title='EMD comparison of the tails (all diagonals - FITTING)'
@@ -401,10 +400,10 @@ def visualize_result(res,add_title='',save=True,quantile=0.1):
             print(temp)
             ut.sorted_barplot(temp,xlabels=res['names'][1:-1],title=title)
             if save:
-                plt.savefig('graphs/automatic_result/%s.png'%title.replace(' ','_').replace('\n','_'))
+                plt.savefig('%s.png'%title.replace(' ','_').replace('\n','_'))
         incr+=1
 
-    #ut.table_latex(comparisons,xlabels=res['names'][1:-1],ylabels=designations,title='comparison of the models: '+add_title)
+    ut.table_latex(comparisons,xlabels=res['names'][1:-1],ylabels=designations,title='comparison of the models: '+add_title)
 
     winner_list=[]
     incr=0
@@ -416,7 +415,7 @@ def visualize_result(res,add_title='',save=True,quantile=0.1):
         winner_list.append(list(map(res['names'][1:-1].__getitem__,index)))
         incr+=1
 
-    #ut.table_latex(winner_list,xlabels=list(range(nb_models)),ylabels=designations,title='comparison of the models: '+add_title)
+    ut.table_latex(winner_list,xlabels=list(range(nb_models)),ylabels=designations,title='comparison of the models: '+add_title)
     return titles,comparisons,designations, winner_list
 
 
@@ -438,9 +437,12 @@ def fake_copulaManager(vects):
         d+=hour
     series=[]
     for v in vects:
-        ser={'date':date,'vect':v,'data':{},'title':{'type':'Wind', 'location':'NP', 'kind':'forecast'}, 'var_function':None}
+        forecast = list(np.random.uniform(0, 4000, length))
+        ser={'date':date,'vect':v,'data':{},'title':{'type':'Wind', 'location':'NP', 'kind':'error'}, 'var_function':None}
+        ser['data']['forecast'] = forecast
+        ser['data']['forecast_d'] = ut.list_derivative(forecast)
         series.append(ser)
-    parameter={'offsets':[0]}
+    parameter={'offsets':[14], 'date_range':('2010-07-01 18:00:00','2016-07-05 01:00:00'),'first_hour':(0,0)}
     return cms.CopulaManagerMS(series,parameter)
 
 

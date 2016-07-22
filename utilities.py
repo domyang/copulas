@@ -663,10 +663,7 @@ def table_latex(l,xlabels=None,ylabels=None,title=None):
                     text='%s %s,'%(text,el_child)
                 text='%s) & '%text[:-1]
             else:
-                if el == min(l[line]):
-                    text="%s\\textbf{%s} & " % (text, el)
-                else:
-                    text='%s%s & '%(text,el)
+                text='%s%s & '%(text,el)
         text='%s \\\\ \n'%text[:-1]
     text='%s\\hline\n\\hline\n\\end{tabular} \n\\end{center}\n\n'%text
     print(text)
@@ -714,17 +711,10 @@ def create_gaussian_density(vects):
     dim = len(vects)
     covariance = np.cov(vects)
     means = np.mean(vects,axis=1)
-    cov_inv = np.linalg.inv(np.matrix(covariance))
-    fact_gau = np.sqrt(np.linalg.det(cov_inv)/(2*math.pi)**dim)
+    pdf = stats.multivariate_normal(mean=means, cov=covariance).pdf
 
     def den_gau(vec):
-        if type(vec[0]) in {int,np.float,float,np.int}:
-            vec=[[j] for j in vec]
-        res=[]
-        for j in zip(*vec):
-            j=np.matrix(j)
-            res.append(fact_gau*math.exp(-(j-means)*cov_inv*np.transpose(j-means)/2))
-        return res
+        return pdf(zip(*vec)).tolist()
 
     return den_gau
 
