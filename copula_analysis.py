@@ -239,89 +239,87 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
         length = len(vects[0])
         dim = len(vects)
 
-        try:
-            # creating the density of a fitted gaussian
-            densities = [ut.create_gaussian_density(vects)]
+        # creating the density of a fitted gaussian
+        densities = [ut.create_gaussian_density(vects)]
 
-            # creating a list of copula models
-            if list_models is None:
-                list_models = [mod.cop_gaussian, mod.cop_student]
-            models = []
-            for i in range(len(list_models)):
-                print('\n### %d th model###' % i)
-                created = list_models[i](unifs)
-                models.append(created)
-                if created.ACR == 'WE':
-                    res['wei_par'].append(created.get_names())
+        # creating a list of copula models
+        if list_models is None:
+            list_models = [mod.cop_gaussian, mod.cop_student]
+        models = []
+        for i in range(len(list_models)):
+            print('\n### %d th model###' % i)
+            created = list_models[i](unifs)
+            models.append(created)
+            if created.ACR == 'WE':
+                res['wei_par'].append(created.get_names())
 
-            # computing the densities of the models, their log-likelihood, and selecting the 'best candidate'
-            names = ['gaussian distribution']
-            cop_densities = []
-            best_model_past = models[0]
-            best_log_past = 0
-            log_past = []
-            for j in models:
-                if first:
-                    names.append(j.name)
-                cop_densities.append(j.pdf)
-                lld = sum([math.log(k) for k in j.pdf(unifs)])
-                log_past.append(lld)
-                if lld > best_log_past:
-                    best_log_past = lld
-                    best_model_past = j
-
-            names.append('selected model')
-            cop_densities.append(best_model_past.pdf)
-            log_past.append(best_log_past)
-
-            res['past_log'].append(log_past)
-            res['selected_model'].append(best_model_past.name)
+        # computing the densities of the models, their log-likelihood, and selecting the 'best candidate'
+        names = ['gaussian distribution']
+        cop_densities = []
+        best_model_past = models[0]
+        best_log_past = 0
+        log_past = []
+        for j in models:
             if first:
-                res['names'] = names
-                first = False
+                names.append(j.name)
+            cop_densities.append(j.pdf)
+            lld = sum([np.log(k) for k in j.pdf(unifs)])
+            log_past.append(lld)
+            if lld > best_log_past:
+                best_log_past = lld
+                best_model_past = j
 
-            # computing the rank of 'obs' among the window points
-            CDFs = ut.marginals_cdf(vects)
-            rank = [float(CDFs[i](obs[1][i])) for i in range(dim)]
+        names.append('selected model')
+        cop_densities.append(best_model_past.pdf)
+        log_past.append(best_log_past)
 
-            ### computing the tail metrics:
-            C_to_D = ut.copula_to_distribution(vects)
-            simulations = [cop.simulate(10000) for cop in models]
-            for i in range(len(models)):
-                if not 0 < np.min(simulations[i]) < np.max(simulations[i]) < 1:
-                    print(i)
-                    print(simulations[i])
-                    print(copula.lengthM)
-                    print(models[i].print_names())
-                    print(models[i].print_par())
-                    return models[i]
-            simulations = list(map(C_to_D, simulations))
-            tail_metrics = ut.compare_tails(simulations, vects, obs[1], quantile=0.1)
-            res['proj_emd'].append(tail_metrics[0])
-            res['proj_quantile'].append(tail_metrics[1])
+        res['past_log'].append(log_past)
+        res['selected_model'].append(best_model_past.name)
+        if first:
+            res['names'] = names
+            first = False
 
-            ### computing the log likelihood ###
-            try:
-                if compare_dist:
-                    res_log = [math.log(den(obs[1])[0]) for den in densities]
-                    res_log.extend(
-                        [den(obs[1])[0] for den in ut.copula_to_densities(vects, cop_densities, log_return=True)])
-                else:
-                    res_log = [den(rank)[0] for den in
-                               ut.distribution_to_copula_densities(vects, densities, log_return=True)]
-                    res_log.extend([math.log(den([[r] for r in rank])[0]) for den in cop_densities])
+        # computing the rank of 'obs' among the window points
+        CDFs = ut.marginals_cdf(vects)
+        rank = [float(CDFs[i](obs[1][i])) for i in range(dim)]
 
-                res['log'].append(res_log)
-            except:
-                res['log'].append(None)
-                res['problem'].append('incr: %d, problem in the log: %r' % (incr, sys.exc_info()[0]))
+        ### computing the tail metrics:
+        C_to_D = ut.copula_to_distribution(vects)
+        simulations = [cop.simulate(10000) for cop in models]
+        for i in range(len(models)):
+            if not 0 < np.min(simulations[i]) < np.max(simulations[i]) < 1:
+                print(i)
+                print(simulations[i])
+                print(copula.lengthM)
+                print(models[i].print_names())
+                print(models[i].print_par())
+                return models[i]
+        simulations = list(map(C_to_D, simulations))
+        tail_metrics = ut.compare_tails(simulations, vects, obs[1], quantile=0.1)
+        res['proj_emd'].append(tail_metrics[0])
+        res['proj_quantile'].append(tail_metrics[1])
 
-            res['len'].append(length)
-            res['rank'].append(rank)
+        ### computing the log likelihood ###
+        try:
+            if compare_dist:
+                res_log = [np.log(den(obs[1])[0]) for den in densities]
+                res_log.extend(
+                    [den(obs[1])[0] for den in ut.copula_to_densities(vects, cop_densities, log_return=True)])
+            else:
+                res_log = [den(rank)[0] for den in
+                           ut.distribution_to_copula_densities(vects, densities, log_return=True)]
+                res_log.extend([math.log(den([[r] for r in rank])[0]) for den in cop_densities])
 
+            res['log'].append(res_log)
         except:
-            res['problem'].append('incr %d general problem: %r' % (incr, sys.exc_info()[0]))
-            print(incr, sys.exc_info()[0], file=sys.stderr)
+            res['log'].append(None)
+            res['problem'].append('incr: %d, problem in the log: %r' % (incr, sys.exc_info()[0]))
+
+        res['len'].append(length)
+        res['rank'].append(rank)
+
+        #res['problem'].append('incr %d general problem: %r' % (incr, sys.exc_info()[0]))
+        #print(incr, sys.exc_info()[0], file=sys.stderr)
 
     copula.update(param_fixed[0], list_parameters=param_fixed)
     return res

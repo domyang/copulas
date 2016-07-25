@@ -85,6 +85,40 @@ def merge_results(*results):
             new_results[]
 """
 
+def log_table(list_of_results):
+    table = 'Trial #: '
+    for name in list_of_results[0]['names'][1:-1]:
+        table += '{:>7} '.format(name[:7])
+    table += '\n'
+    for i, trial in enumerate(list_of_results):
+        table += '{:<9}'.format(i)
+        for j, _ in enumerate(trial['names'][1:-1]):
+            table += '{:7.4f} '.format(np.mean(list(zip(*trial['log']))[j+1]))
+        table += '\n'
+
+    return table
+
+def averages(list_of_results):
+    average_results = []
+    for trial in list_of_results:
+        average_results.append(np.mean(trial['log'], 0).tolist())
+    return list(zip(*average_results))
+
+def rank_table(names, values):
+    table = 'Trial #: '
+    for name in names:
+        table += '{:>7} '.format(name[:7])
+    table += '\n'
+    for i, trial in enumerate(values[0]):
+        table += '{:<9}'.format(i)
+        row = [-col[i] for col in values] # negative to reverse order
+        ranks = stats.rankdata(row)
+        for rank in ranks:
+            table += '{:>7d} '.format(int(rank))
+        table += '\n'
+
+    return table
+
 def join_results(list_of_results):
     new_results = list_of_results[0].copy()
     for result in list_of_results[1:]:

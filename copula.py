@@ -90,7 +90,7 @@ class CopulaManager:
                     for key in data.keys():
                         data_temp[key].append(None)
                     date_temp.append(cur)
-                    cur = cur + 3600
+                    cur += 3600
 
                 while cur > index:
                     print(
@@ -106,7 +106,7 @@ class CopulaManager:
                     for key in data.keys():
                         data_temp[key].append(next(data_it[key]))
 
-                cur = cur + 3600
+                cur += 3600
 
             self.vect = vect_temp
             self.date = date_temp

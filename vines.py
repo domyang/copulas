@@ -294,26 +294,27 @@ class D_vine(conditional):
             # selecting and fitting the best copula model for each pair of observations
             for pair in range(dim - step - 1):
 
-                best_copula = None  # max(list_models[step], key=lambda cop: cop([obs1[pair], obs2[pair]]).log_likelihood([obs1[pair], obs2[pair]]))
+                pair_obs = [obs1[pair], obs2[pair]]
+                best_copula = max(list_models[step], key=lambda cop: cop(pair_obs).log_likelihood(pair_obs))
                 best_lld = 0
 
                 # print(list_models)
-                for cop in list_models[step]:
-                    # try:
-                    copula_tp = cop([obs1[pair], obs2[pair]])
-                    lld_tp = copula_tp.log_likelihood([obs1[pair], obs2[pair]]) - len(copula_tp.parameter_list())
-                    # print('\n### step: %d copula: %s, log: %r, par: %r\n'%(step,copula_tp.name,lld_tp,copula_tp.par))
-
-                    if best_copula is None:
-                        best_lld = lld_tp
-                        best_copula = copula_tp
-                    else:
-                        if lld_tp > best_lld:
-                            best_copula = copula_tp
-                            best_lld = lld_tp
-                            # except:
-                            #     print([obs1[pair], obs2[pair]])
-                            #     print("could not estimate log likelihood of %dth copula" % pair)
+                # for cop in list_models[step]:
+                #     # try:
+                #     copula_tp = cop([obs1[pair], obs2[pair]])
+                #     lld_tp = copula_tp.log_likelihood([obs1[pair], obs2[pair]]) - len(copula_tp.parameter_list())
+                #     # print('\n### step: %d copula: %s, log: %r, par: %r\n'%(step,copula_tp.name,lld_tp,copula_tp.par))
+                #
+                #     if best_copula is None:
+                #         best_lld = lld_tp
+                #         best_copula = copula_tp
+                #     else:
+                #         if lld_tp > best_lld:
+                #             best_copula = copula_tp
+                #             best_lld = lld_tp
+                #             # except:
+                #             #     print([obs1[pair], obs2[pair]])
+                #             #     print("could not estimate log likelihood of %dth copula" % pair)
 
                 copulae_for_step.append(best_copula)
 
@@ -496,15 +497,15 @@ class cop2d(object):
     def log_likelihood(self, unifs, theta=None):
         return 0
 
-    ### returns a list of the parameters
+    ## returns a list of the parameters
     def parameter_list(self):
         return []
 
-    ### modifies the parameters of the copula
+    ## modifies the parameters of the copula
     def assign_parameter(self, theta):
         pass
 
-    ### print method for 2d copulae
+    ## print method for 2d copulae
     def pprint(self):
         s = '\n### Copula Model: ' + self.name + ' ###\n\n'
         s += 'parameters: %r' % self.par
@@ -522,6 +523,124 @@ class cop2d(object):
 
 # -------------------------------------- 2d copulae models ------------------------------------------------------------
 
+## returns a 'gaussian copula' fitted to the given points
+class cop2d_gaussian2(cop2d):
+    name = 'gaussian'
+    ACR = 'GA'
+
+    def __init__(self, uniforms):
+
+        # Inference
+        if uniforms is None:
+            uniforms = [[0.5, 0.6], [0.5, 0.4]]
+
+        if not (ut.good_format(uniforms)[1]):
+            print(uniforms)
+            raise (RuntimeError('uniforms should be a list of same length list'))
+
+        a = stats.norm([0], [1])
+        vects = [[a.ppf(j)[0] for j in coor] for coor in uniforms]
+
+        cov = norm_matrix(np.cov(np.matrix(vects)))
+
+        self.par['cov'] = cov
+
+        self.uniforms = uniforms
+        self.vects = vects
+        self.length = len(uniforms[0])
+        self.name = 'gaussian'
+        self.nbPar = 1
+        self.bounds = bounds = [(epsilon - 1, 1 - epsilon)]
+
+        opt_result = optimize.minimize_scalar(lambda x: -self.log_likelihood(uniforms, x),
+                                              bounds=bounds[0], method='bounded')
+        if opt_result['success']:
+            # print('old parameter: %f, new: %f ' % (self.par['cov'][0, 1], opt_result['x']))
+            self.par['corr'] = opt_result['x']
+        else:
+            print('Maximization of log likelihood was unsuccessful in cop2d_gaussian')
+
+        # defining the conditional cdf
+        self.conditionalCDF = self.createConditionalCDF()
+
+    def pdf(self, unifs):
+        """Computes pdf for a list of lists"""
+        if np.ndim(unifs) < 2:
+            unifs = [[i] for i in unifs]
+        points = zip(*unifs)
+        return [self.single_pdf(u, v, self.par['corr']) for (u, v) in points]
+
+    # Simulation
+    def simulate(self, x):
+        redistributed = np.transpose(np.random.multivariate_normal([0] * 2, self.par['cov'], x))
+        return ut.uniforms(redistributed.tolist())
+
+    # density function
+    def single_pdf(self, u, v, corr=None):
+
+        if corr is None:
+            corr = self.par['corr']
+
+        first = 1 / np.sqrt(1 - corr ** 2)
+        x1, x2, = stats.norm.ppf(u), stats.norm.ppf(v)
+        arg = -(corr ** 2 * (x1 ** 2 + x2 ** 2) - 2 * corr * x1 * x2) / (2 * (1 - corr ** 2))
+        return first * np.exp(arg)
+
+    # partial CDF: dC/dx
+    # coor specifies along which coordinate (x0 or x1) it is differentiated
+    def createConditionalCDF(self):
+        cov = self.par['cov']
+
+        new_var = (1 - cov[0, 1] ** 2)
+        self.norm_obj0 = stats.norm(0, 1)
+        self.norm_obj1 = stats.norm(0, np.sqrt(new_var))
+        self.last_par_1 = cov[0, 1]
+
+        def conditionalCDF(unifs, coor):
+
+            if not self.last_par_1 == self.par['cov'][0, 1]:
+                new_var = (1 - cov[0, 1] ** 2)
+                self.norm_obj1 = ut.fast_stats(stats.norm([0], np.sqrt(new_var)))
+                self.last_par_1 = cov[0, 1]
+
+            not_list = np.ndim(unifs) < 2
+            if not_list:
+                unifs = [[i] for i in unifs]
+
+            if (coor != 0) & (coor != 1):
+                raise (RuntimeError('coor specifies the coordinate: it must be either 0 or 1'))
+            if coor == 1:
+                other = 0
+            else:
+                other = 1
+
+            # the corresponding points in the 'real space' (ie. where the are distributed according to a normal law))
+            vecs = [self.norm_obj0.ppf(unifs[i]) for i in range(2)]
+            temp = [i[other] - cov[0, 1] * i[coor] for i in zip(*vecs)]
+            res = self.norm_obj1.cdf(temp)
+            return res
+
+
+        return conditionalCDF
+
+    # log-likelihood
+    def log_likelihood(self, unifs, corr=None):
+        if corr is None:
+            corr = self.par['corr']
+        total = 0
+        for (u, v) in zip(*unifs):
+            first = (-1/2) * np.log(1 - corr ** 2)
+            x1 = stats.norm.ppf(u)
+            x2 = stats.norm.ppf(v)
+            second = - (corr ** 2 * (x1 ** 2 + x2 ** 2) - 2 * corr * x1 * x2) / (2 * (1 - corr ** 2))
+            total += first + second
+        return total
+
+    def parameter_list(self):
+        return [self.par['cov'][0, 1]]
+
+    def assign_parameter(self, theta):
+        self.par['cov'] = np.matrix([[1, theta[0]], [theta[0], 1]])
 
 ### returns a 'gaussian copula' fitted to the given points
 class cop2d_gaussian(cop2d):

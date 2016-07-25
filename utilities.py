@@ -654,14 +654,16 @@ def table_latex(l, xlabels=None, ylabels=None, title=None):
     for line in range(hei):
         if ylabels is not None:
             text = '%s\\textbf{%s} & ' % (text, ylabels[line])
-        for el in l[line]:
+        for i, el in enumerate(l[line]):
             if np.ndim(el) == 1 | (type(el) == set):
                 text += '('
                 for el_child in el:
                     text = '%s %s,' % (text, el_child)
                 text = '%s) & ' % text[:-1]
             else:
-                text = '%s%s & ' % (text, el)
+                text = '%s%s ' % (text, el)
+                if i != len(l[line]) - 1:
+                    text += '& '
         text = '%s \\\\ \n' % text[:-1]
     text = '%s\\hline\n\\hline\n\\end{tabular} \n\\end{center}\n\n' % text
     print(text)

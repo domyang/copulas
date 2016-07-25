@@ -42,7 +42,7 @@ def gaussian_sample(size=1000, mean=None, cov=None, dim=2):
 
 if __name__ == '__main__':
     gu = vines.cop2d_gumbel
-    ga = vines.cop2d_gaussian
+    ga = vines.cop2d_gaussian2
     st = vines.cop2d_student
     fr = vines.cop2d_frank
     un = vines.cop2d_uniform
