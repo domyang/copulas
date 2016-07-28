@@ -1,7 +1,7 @@
 import csv
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from pyemd import emd
+#from pyemd import emd
 import math
 from pylab import rcParams
 import numpy as np
@@ -17,8 +17,8 @@ import utilities as ut
 import subsetModel as sub
 import sys
 
-home_dir='/home/ambroiseidoine/UCD/'
-sys.path.append(home_dir+'code/prescient/release/Prescient_1.0/')
+home_dir='C:\\users\\sabrina\\documents\\research\\code for real user\\'
+sys.path.append(home_dir+'prescient/release/Prescient_1.0/')
 
 import exec.MasterOptions as MasterOptions
 
@@ -455,16 +455,16 @@ def main(args=None):
         # it to exit gracefully.
         return
 
-    # l=ca.get_data(type='Solar')
-    # dico=ut.prepare_solar(l)
-    # test(2)
-    # spatial_correlation(offset_max=400)
-    # type_correlation()
-    # tails()
-    # forecast_dependence()
-    # student_custom()
-    # marginals_test()
-    # compare_distributions()
+    l=ca.get_data(type='Solar')
+    dico=ut.prepare_solar(l)
+    test(2)
+    spatial_correlation(offset_max=400)
+    type_correlation()
+    tails()
+    forecast_dependence()
+    student_custom()
+    marginals_test()
+    compare_distributions()
 
 
     plt.show()

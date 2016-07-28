@@ -646,9 +646,8 @@ def table_latex(l, xlabels=None, ylabels=None, title=None):
     if xlabels is not None:
         if ylabels is not None:
             text = '%s&' % text
-        for el in xlabels:
-            text = '%s \\textbf{%s} & ' % (text, el)
-        text = '%s \\\\ \n' % text[:-1]
+        text += ' & '.join(['\\textbf{%s}' % el for el in xlabels])
+        text = '%s \\\\ \n' % text
         text += '\\hline\n'
 
     for line in range(hei):
