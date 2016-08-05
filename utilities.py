@@ -374,9 +374,9 @@ def remove_in_list(l, k, when=[], reverse=False):
 def is_list_of(l, child=int):
     res = False
     if l is not None:
-        if type(l) == child:
+        if isinstance(l, child):
             l = [l]
-        if type(l) == list:
+        if isinstance(l, list):
             if len(l) > 0:
                 res = True
                 for i in l:
