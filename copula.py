@@ -1,5 +1,5 @@
-import matplotlib.pyplot as plt
 import dateutil.parser as dt
+import matplotlib.pyplot as plt
 import utilities as ut
 
 
@@ -59,7 +59,7 @@ class CopulaManager:
     #                           the kind of data that has been given in argument
     def __init__(self, arg_date, vect, data, parameters, var_function=None):
 
-        if type(arg_date[0]) is int:
+        if isinstance(arg_date[0], int):
             date = arg_date
         else:
             date = [int(dt.parse(i).timestamp()) for i in arg_date]
@@ -94,7 +94,7 @@ class CopulaManager:
 
                 while cur > index:
                     print(
-                        'Warning: possibly twice the same entry at date %s' % dt_object.fromtimestamp(index).__str__())
+                        'Warning: possibly twice the same entry at date %s' % str(dt_object.fromtimestamp(index)))
                     index = next(date_it)
                     next(vect_it)
                     for key in data.keys():
@@ -202,8 +202,8 @@ class CopulaManager:
         # if this is errors in Solar power forecasts, applying reverse variance transformation to get the correct values in vectM
         # (variances were scaled to 1 for each solar hour, now we multiply by the variance corresponding
         # to the solar hour of 'predicted_day' with offset)
-        if (parameters['type'] == 'Solar') & (parameters['kind'] == 'error'):
-            if ('hour_sol' in data_keys) & (self.var_function is not None):
+        if (parameters['type'] == 'Solar') and (parameters['kind'] == 'error'):
+            if ('hour_sol' in data_keys) and (self.var_function is not None):
                 if not 'predicted_day' in parameters.keys():
 
                     if 'date_range' in parameters.keys():

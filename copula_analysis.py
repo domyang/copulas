@@ -1,16 +1,17 @@
-import time
 import csv
-import sys
-import matplotlib.pyplot as plt
 import math
-import numpy as np
-import dateutil.parser as dt
-from dateutil.relativedelta import relativedelta
-import utilities as ut
+import sys
+import time
+
 import copulaMS as cms
 import copulaModels as mod
+import dateutil.parser as dt
+import matplotlib.pyplot as plt
+import numpy as np
 import subsetModel as sub
+import utilities as ut
 import vines
+from dateutil.relativedelta import relativedelta
 
 home_dir = 'C:\\users\\sabrina\\documents\\research\\code for real user\\'
 
@@ -98,7 +99,6 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
                 start_incr=None, end_incr=None,
                 keep_vec=False, compare_dist=False):
     min_points = 30
-    epsilon = 0.00001
     win_days = max(min_points, win_days)
 
     start_time = time.time()
@@ -114,7 +114,7 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
 
     # initializing variables
     parameters = copula.parameters
-    nb_series = copula.copulae.__len__()
+    nb_series = len(copula.copulae)
     start_serie = [0]
     start_serie.extend(np.cumsum([copula.copulae[i].dim for i in range(nb_series)])[:-1])
     forecasts = [copula.dataM[i]['forecast'][0] for i in range(nb_series)]
@@ -141,10 +141,9 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
     #       The copula manager is updated to fit the window (using 'win_days' and 'win_forecast')
     #       Models are created to fit the updated copula
     #       The log_likelihood of the observation is computed for all different models
-    for obs in zip(*[list(zip(*forecasts)), list(zip(*errors)), dates]):
+    for forecast, error, date in zip(zip(*forecasts), zip(*errors), dates):
 
-        obs = list(obs)
-        obs[2] = dt_object.fromtimestamp(obs[2]).__str__()
+        date = str(dt_object.fromtimestamp(date))
 
         # selecting the observation range
         incr += 1
@@ -168,70 +167,19 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
             print('\n\n   ####################   \n\niter %d: forecast %r, error %r, date %s\n\n'
                   'time elapsed in the last loop: %d:%d:%d, time since start: %d:%d:%d'
                   '\n\n   ####################   \n\n'
-                  % (incr, obs[0], obs[1], obs[2], t_print[0][0], t_print[0][1], t_print[0][2], t_print[1][0],
+                  % (incr, forecast, error, date, t_print[0][0], t_print[0][1], t_print[0][2], t_print[1][0],
                      t_print[1][1], t_print[1][2]))
             return last_time
 
         last_time = print_info(last_time=last_time)
 
-        ### selecting past observations using the window ###
-        def select_observations():
-            for ser in range(nb_series):
-                parameters[ser]['win_forecast'] = [(-np.inf, np.inf) for i in range(copula.copulae[ser].dim)]
-                parameters[ser]['predicted_day'] = obs[2]
-                if not repeat_win_days:
-                    parameters[ser]['date_range'] = (str(dt.parse(obs[2]) - relativedelta(days=win_days)),
-                                                     str(dt.parse(obs[2]) - relativedelta(hours=1)))
-                else:
-                    parameters[ser]['date_range'] = ut.intersect_dates(param_fixed[0]['date_range'], obs[2], win_days)
-
-            try:
-                copula.update(parameters[0], list_parameters=parameters)
-            except:
-                print('Error updating copula at incr %d' % incr)
-                return None
-            if copula.lengthM < min_points:
-                print('Error updating copula at incr %d' % incr)
-                return None
-
-            forecast_tp = [copula.dataM[i]['forecast'][0] for i in range(nb_series)]
-            for i in range(nb_series):
-                forecast_tp[i].append(obs[0][i])
-            sorted_indexes = [sorted(range(copula.lengthM + 1), key=forecast_tp[i].__getitem__) for i in
-                              range(nb_series)]
-
-            # gets the nb nearest neighbours of ths observation (whose value is len(x)-1) in x
-            def around_obs(x, nb):
-                half = int(nb // 2)
-                index = x.index(len(x) - 1)
-                start = max(0, min(index - half, len(x) - nb - 1))
-                res_tp = x[start:index]
-                res_tp.extend(x[index + 1:start + nb + 1])
-                return res_tp
-
-            # gets the indexes of the nearest points (enough of them)
-            def get_indexes():
-                nb = int(np.ceil(win_forecast * copula.lengthM)) * 2
-                indexes_tp = []
-
-                while len(indexes_tp) < min_points:
-
-                    indexes_tp = around_obs(sorted_indexes[0], nb)
-                    for i in range(1, nb_series):
-                        indexes_tp = np.intersect1d(indexes_tp, around_obs(sorted_indexes[i], nb))
-                    nb += 2
-                return indexes_tp
-
-            indexes = get_indexes()
-            vects = [list(map(copula.vectM[i].__getitem__, indexes)) for i in range(copula.dim)]
-            unifs = ut.uniforms(vects, rand=False)
-            return vects, unifs
-
-        selected_observations = select_observations()
-        if selected_observations is None:
+        observations = select_observations(copula, date, forecast, repeat_win_days=repeat_win_days,
+                                           win_days=win_days, win_forecast=win_forecast, param_fixed=param_fixed,
+                                           incr=incr)
+        if observations is None:
             continue
         else:
-            vects, unifs = selected_observations
+            vects, unifs = observations
 
 
             ### fitting models to the distribution
@@ -281,7 +229,7 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
 
         # computing the rank of 'obs' among the window points
         CDFs = ut.marginals_cdf(vects)
-        rank = [float(CDFs[i](obs[1][i])) for i in range(dim)]
+        rank = [float(CDFs[i](error[i])) for i in range(dim)]
 
         ### computing the tail metrics:
         C_to_D = ut.copula_to_distribution(vects)
@@ -295,20 +243,20 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
                 print(models[i].print_par())
                 return models[i]
         simulations = list(map(C_to_D, simulations))
-        tail_metrics = ut.compare_tails(simulations, vects, obs[1], quantile=0.1)
+        tail_metrics = ut.compare_tails(simulations, vects, error, quantile=0.1)
         res['proj_emd'].append(tail_metrics[0])
         res['proj_quantile'].append(tail_metrics[1])
 
         ### computing the log likelihood ###
         try:
             if compare_dist:
-                res_log = [np.log(den(obs[1])[0]) for den in densities]
+                res_log = [np.log(den(error)[0]) for den in densities]
                 res_log.extend(
-                    [den(obs[1])[0] for den in ut.copula_to_densities(vects, cop_densities, log_return=True)])
+                    [den(error)[0] for den in ut.copula_to_densities(vects, cop_densities, log_return=True)])
             else:
                 res_log = [den(rank)[0] for den in
                            ut.distribution_to_copula_densities(vects, densities, log_return=True)]
-                res_log.extend([math.log(den([[r] for r in rank])[0]) for den in cop_densities])
+                res_log.extend([np.log(den([[r] for r in rank])[0]) for den in cop_densities])
 
             res['log'].append(res_log)
         except:
@@ -418,6 +366,62 @@ def visualize_result(res, add_title='', save=True, quantile=0.1):
                    title='comparison of the models: ' + add_title)
     return titles, comparisons, designations, winner_list
 
+
+def select_observations(copula, date, forecast, repeat_win_days=False, win_days=90, win_forecast=0.2, incr=None,
+                        param_fixed=None, ):
+    nb_series = len(copula.copulae)
+    parameters = copula.parameters
+    min_points = max(30, win_days)
+    for ser in range(nb_series):
+        parameters[ser]['win_forecast'] = [(-np.inf, np.inf) for _ in range(copula.copulae[ser].dim)]
+        parameters[ser]['predicted_day'] = date
+        if not repeat_win_days:
+            parameters[ser]['date_range'] = (str(dt.parse(date) - relativedelta(days=win_days)),
+                                             str(dt.parse(date) - relativedelta(hours=1)))
+        else:
+            parameters[ser]['date_range'] = ut.intersect_dates(param_fixed[0]['date_range'], date, win_days)
+
+    try:
+        copula.update(parameters[0], list_parameters=parameters)
+    except:
+        print('Error updating copula at incr %d' % incr)
+        return None
+    if copula.lengthM < min_points:
+        print('Error updating copula at incr %d' % incr)
+        return None
+
+    forecast_tp = [copula.dataM[i]['forecast'][0] for i in range(nb_series)]
+    for i in range(nb_series):
+        forecast_tp[i].append(forecast[i])
+    sorted_indexes = [sorted(range(copula.lengthM + 1), key=forecast_tp[i].__getitem__) for i in
+                      range(nb_series)]
+
+    # gets the nb nearest neighbours of ths observation (whose value is len(x)-1) in x
+    def around_obs(x, nb):
+        half = nb // 2
+        index = x.index(len(x) - 1)
+        start = max(0, min(index - half, len(x) - nb - 1))
+        res_tp = x[start:index]
+        res_tp.extend(x[index + 1:start + nb + 1])
+        return res_tp
+
+    # gets the indexes of the nearest points (enough of them)
+    def get_indexes():
+        nb = int(np.ceil(win_forecast * copula.lengthM)) * 2
+        indexes_tp = []
+
+        while len(indexes_tp) < min_points:
+
+            indexes_tp = around_obs(sorted_indexes[0], nb)
+            for i in range(1, nb_series):
+                indexes_tp = np.intersect1d(indexes_tp, around_obs(sorted_indexes[i], nb))
+            nb += 2
+        return indexes_tp
+
+    indexes = get_indexes()
+    vects = [list(map(copula.vectM[i].__getitem__, indexes)) for i in range(copula.dim)]
+    unifs = ut.uniforms(vects, rand=False)
+    return vects, unifs
 
 # -------------------------------------------- other functions --------------------------------------------------
 

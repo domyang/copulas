@@ -1,27 +1,22 @@
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from mpl_toolkits.mplot3d import Axes3D
-# from pyemd import emd
 import math
-from pylab import rcParams
-import numpy as np
-import scipy as sc
-from scipy.integrate import quad as integ
-from scipy import optimize as opt
-from scipy.interpolate import interp1d
-import dateutil.parser as dt
-from dateutil.relativedelta import relativedelta
-import sys
-import ephem
 import random
+import sys
+
+import dateutil.parser as dt
+import ephem
+import matplotlib.pyplot as plt
+import numpy as np
+from dateutil.relativedelta import relativedelta
+from pylab import rcParams
+from scipy import optimize as opt
 from scipy import stats
+from scipy.interpolate import interp1d
 
 home_dir = 'C:\\users\\sabrina\\documents\\research\\code for real user\\'
 
 sys.path.append(home_dir + 'prescient/release/Prescient_1.0/')
 sys.path.append(home_dir + 'prescient/release/Prescient_1.0/exec')
 import ScenGen.workflow.EpiModel as EpiModel
-import exec.MasterOptions as MasterOptions
 
 
 # ------------------------------ index ---------------------------------------------------------------
@@ -79,7 +74,7 @@ def find_spline(x, y, options=None, visualize=False, seg_N=5, positiveness_const
     factor_y = (max(y) - min(y) + 0.000001)
     x_t = [float((i - offset) / factor_x) for i in x]
     y_t = [float(i / factor_y) for i in y]
-    x_temp = [];
+    x_temp = []
     y_temp = []
     for i in range(len(x)):
         if not x_t[i] in x_temp:
@@ -127,14 +122,14 @@ def find_spline(x, y, options=None, visualize=False, seg_N=5, positiveness_const
 # arguments
 #   () dico coefficients for the interpolation
 def create_spline(dico):
-    a = dico['a'];
-    s0 = dico['s0'];
-    v0 = dico['v0'];
-    min_x = dico['min_x'];
-    max_x = dico['max_x'];
+    a = dico['a']
+    s0 = dico['s0']
+    v0 = dico['v0']
+    min_x = dico['min_x']
+    max_x = dico['max_x']
     N = dico['N']
-    offset = dico['offset'];
-    factor_x = dico['factor_x'];
+    offset = dico['offset']
+    factor_x = dico['factor_x']
     factor_y = dico['factor_y']
 
     # estimating function
@@ -159,14 +154,14 @@ def create_spline(dico):
 
 ### returns the derivative corresponding to a spline function
 def create_spline_d(dico):
-    a = dico['a'];
-    s0 = dico['s0'];
-    v0 = dico['v0'];
-    min_x = dico['min_x'];
-    max_x = dico['max_x'];
+    a = dico['a']
+    s0 = dico['s0']
+    v0 = dico['v0']
+    min_x = dico['min_x']
+    max_x = dico['max_x']
     N = dico['N']
-    offset = dico['offset'];
-    factor_x = dico['factor_x'];
+    offset = dico['offset']
+    factor_x = dico['factor_x']
     factor_y = dico['factor_y']
 
     # estimating function
@@ -702,6 +697,22 @@ def sorted_barplot(val, title=None, xlabels=None, min_zero=False):
     rcParams.update({'font.size': 9})
 
 
+def hist3D(x, y, bins):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    hist, xedges, yedges = np.histogram2d(x, y, bins=bins)
+
+    elements = (len(xedges) - 1) * (len(yedges) - 1)
+    xpos, ypos = np.meshgrid(xedges[:-1], yedges[:-1])
+
+    xpos = xpos.flatten()
+    ypos = ypos.flatten()
+    zpos = np.zeros(elements)
+    dx = 1 / bins * np.ones_like(zpos)
+    dy = dx.copy()
+    dz = hist.flatten()
+
+    return ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color='b', zsort='average')
 # ------------------------------ for distributions estimates -----------------------------------------------------------
 
 ### returns the pdf function of a gaussian fitted to vects
@@ -1254,7 +1265,7 @@ def compare_tails(simulations, past_obs, obs, quantile=0.1, visualize=False):
 # arguments:
 #   () vect1,vect2: specifies the 2 data range of same length to fit the normal law
 def redistribute_gaussian(vect1, vect2, length=0, fit=True):
-    if (length > 50000) | (length < 10):
+    if (length > 50000) or (length < 10):
         count = len(vect1)
     else:
         count = length
@@ -1284,7 +1295,7 @@ def pearson_with_holes(vects, hole=None):
             vec_bis = []
             incr = 0
             for k in vec:
-                if (k[0] != hole) & (k[1] != hole):
+                if (k[0] != hole) and (k[1] != hole):
                     vec_bis.append(k)
                     incr += 1
             if len(vec_bis) > 1:
@@ -1845,25 +1856,19 @@ def distribution_to_copula_densities(vects, densities, log_return=False):
         return res[0]
 
 
-# returns the rank of vects.
+# returns the rank of vects normalized by the length.
 # If rand, it will simulate uniform points by replacing the rank by the value of the n^th point
 def uniforms(vects, rand=True):
     length = len(vects[0])
     res = []
-    for i in vects:
-        index = sorted(range(length), key=i.__getitem__)
+    for vect in vects:
+        ranks = stats.rankdata(vect)
         if (rand):
-            unif = np.random.rand(length)
-            unif.sort()
-            temp = [0 for j in range(length)]
-            for j in range(length):
-                temp[index[j]] = unif[j]
-            res.append(temp)
+            unifs = sorted(np.random.rand(length))
+            ## Sort uniformly distributed points by ranks
+            res.append([unif for (rank, unif) in sorted(zip(ranks, unifs), key=lambda pair: pair[0])])
         else:
-            temp = [0 for j in range(length)]
-            for j in range(length):
-                temp[index[j]] = (1 + j) / (length + 1)
-            res.append(temp)
+            res.append((ranks / (length + 1)).tolist())
 
     return res
 
@@ -1934,9 +1939,9 @@ def sun_rise_set(date):
 def prepare_solar(l, visualize=False):
     length = len(l['date'])
     error = [l['act'][i] - l['for'][i] for i in range(length)]
-    d = l['date'].copy();
-    e = error.copy();
-    f = l['for'].copy();
+    d = l['date'].copy()
+    e = error.copy()
+    f = l['for'].copy()
     a = l['act'].copy()
     hour_sol = []
     date = []
