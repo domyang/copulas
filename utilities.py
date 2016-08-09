@@ -5,6 +5,7 @@ import sys
 import dateutil.parser as dt
 import ephem
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from dateutil.relativedelta import relativedelta
 from pylab import rcParams
@@ -1416,13 +1417,13 @@ def empirical_CDF_scalar(obs, exp_tails=True, mi=None, ma=None):
             if ind == 0:
                 if exp_tails:
                     # exponential tail with matching derivative
-                    return wei[0] * math.exp(-(pts[0] - x) * wei[1] / (wei[0] * (pts[1] - pts[0])))
+                    return wei[0] * np.exp(-(pts[0] - x) * wei[1] / (wei[0] * (pts[1] - pts[0])))
                 else:
                     # linear tail with matching derivative
                     return max(0, wei[0] * (1 - (pts[0] - x) * wei[1] / (wei[0] * (pts[1] - pts[0]))))
             elif ind == len(pts):
                 if exp_tails:
-                    return 1 - (1 - cum_wei[-1]) * math.exp(
+                    return 1 - (1 - cum_wei[-1]) * np.exp(
                         - (x - pts[-1]) * wei[-1] / ((1 - cum_wei[-1]) * (pts[-1] - pts[-2])))
                 return min(1, 1 - (1 - cum_wei[-1]) * (
                 1 - (x - pts[-1]) * wei[-1] / ((1 - cum_wei[-1]) * (pts[-1] - pts[-2]))))
@@ -1445,7 +1446,7 @@ def empirical_CDF_scalar(obs, exp_tails=True, mi=None, ma=None):
         raise (RuntimeError('impossible to compute a CDF with less than 2 points'))
 
     # taking min and max into account
-    if bi | ba:
+    if bi or ba:
         obs_bis = []
         if bi:
             obs_bis.append(mi)
@@ -1510,9 +1511,9 @@ def empirical_CDF_inv(obs, log_tails=True, mi=None, ma=None):
         # print(cum_wei)
 
         def f(x):
-            if (x > 1) | (x < 0):
+            if (x > 1) or (x < 0):
                 raise (RuntimeError('x should be comprised between 0 and 1'))
-            if log_tails & ((x == 1) | (x == 0)):
+            if log_tails and ((x == 1) or (x == 0)):
                 raise (RuntimeError('x should be comprised between 0 and 1'))
 
             ind = int(np.searchsorted(cum_wei, x))
@@ -1520,13 +1521,13 @@ def empirical_CDF_inv(obs, log_tails=True, mi=None, ma=None):
             if ind == 0:
                 if log_tails:
                     # log tail with matching derivative
-                    return math.log(x / wei[0]) * wei[0] * (pts[1] - pts[0]) / wei[1] + pts[0]
+                    return np.log(x / wei[0]) * wei[0] * (pts[1] - pts[0]) / wei[1] + pts[0]
                 else:
                     # linear tail with matching derivative
                     return pts[0] + (wei[0] - x) / wei[1] * (pts[0] - pts[1])
             elif ind == len(pts):
                 if log_tails:
-                    return pts[-1] - math.log((1 - x) / (1 - cum_wei[-1])) / wei[-1] * (
+                    return pts[-1] - np.log((1 - x) / (1 - cum_wei[-1])) / wei[-1] * (
                     (1 - cum_wei[-1]) * (pts[-1] - pts[-2]))
                 else:
                     return pts[-1] + (x - cum_wei[-1]) * (pts[-1] - pts[-2]) / wei[-1]
@@ -1542,7 +1543,7 @@ def empirical_CDF_inv(obs, log_tails=True, mi=None, ma=None):
         raise (RuntimeError('impossible to compute a CDF with less than 2 points'))
 
     # taking min and max into account
-    if bi | ba:
+    if bi or ba:
         obs_bis = []
         if bi:
             obs_bis.append(mi)
@@ -1600,7 +1601,7 @@ def marginals_cdf(vects, seg_N=10, interpolate='linear'):
             mi *= div
             dmi, dma = df(h[1][0]) * div, df(h[1][-1]) * div
 
-            if (mi > 0) & (dmi > 0) & (dma > 0):
+            if (mi > 0) and (dmi > 0) and (dma > 0):
                 mi_a = dmi / mi
                 mi_b = mi / (math.exp(mi_a * h[1][0]))
                 ma_a = dma / (1 - ma)
@@ -1639,7 +1640,7 @@ def marginals_cdf_inv(vects, seg_N=10, limits=None, interpolate='linear', ):  # 
     dim = len(vects)
     limited = False
     if limits is not None:
-        if type(limits) == tuple:
+        if isinstance(limits, tuple):
             if len(limits) == 2:
                 limited = True
 
@@ -1759,11 +1760,10 @@ def copula_to_distribution(vects, visualize=False):
 
     def func(unifs, visu=visualize):
         if len(unifs) != dim:
-            raise (RuntimeError('vetcs and unifs must have same dimensions'))
+            raise (RuntimeError('vects and unifs must have same dimensions'))
         res = []
         for i in range(dim):
-            temp = list(map(f_inv[i], unifs[i]))
-            res.append(temp)
+            res.append([f_inv[i](x) for x in unifs[i]])
 
         if visu:
             plt.figure()

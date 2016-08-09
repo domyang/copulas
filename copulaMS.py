@@ -2,10 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 import math
-import dateutil.parser as dt
 import utilities as ut
 import copula as cop
-
+from datetime import datetime, timedelta
 
 # READ ME:
 #
@@ -65,8 +64,8 @@ class CopulaManagerMS:
         if just_parameters is None:
             just_parameters = self.just_parameters
 
-        if create & (series is None):
-            raise (RuntimeError('you need to give a \'series\' argument to create a copulaManager'))
+        if create and (series is None):
+            raise (RuntimeError("you need to give a 'series' argument to create a copulaManager"))
 
         if create:
             nbSeries = len(series)
@@ -76,39 +75,39 @@ class CopulaManagerMS:
             for ser in series:
                 if not {'date', 'vect', 'data', 'title'}.issubset(ser.keys()):
                     raise (RuntimeError(
-                        'each element of series should have at least these entry key: {\'date\',\'vect\',\'data\',\'title\'}'))
+                        "each element of series should have at least these entry key: {'date','vect','data','title'}"))
         else:
             nbSeries = self.nbSeries
 
         if just_parameters is None:
-            just_parameters = [False for i in range(nbSeries)]
+            just_parameters = [False] * nbSeries
 
         par = []
         for i in range(nbSeries):
             par.append(parameters_def.copy())
 
         if list_parameters is not None:
-            if (type(list_parameters) != list) | (len(list_parameters) != self.nbSeries):
+            if (not isinstance(list_parameters, list)) or (len(list_parameters) != self.nbSeries):
                 print(
-                    'WARNING: list_parameters should be either None or a list same length as series; it won\'t be considered')
+                    "WARNING: list_parameters should be either None or a list same length as series; it won't be considered")
                 list_parameters = None
 
         if list_parameters is not None:
             for j in range(nbSeries):
                 i = list_parameters[j]
                 if i is not None:
-                    if (type(i) == dict):
+                    if isinstance(i, dict):
                         par[j] = i
 
         for i in range(nbSeries):
             if create:
-                for key in series[i]['title'].keys():
+                for key in series[i]['title']:
                     par[i][key] = series[i]['title'][key]
             else:
                 for key in {'type', 'location', 'kind'}:
                     par[i][key] = self.parameters[i][key]
             # defines sub_parameters in case the serie's offsets are an empty list
-            if (type(par[i]['offsets']) != list) | (len(par[i]['offsets']) == 0):
+            if (not isinstance(par[i]['offsets'], list)) or (len(par[i]['offsets']) == 0):
                 par[i]['offsets'] = [0]
                 just_parameters[i] = True
 
@@ -130,11 +129,10 @@ class CopulaManagerMS:
 
                 ### 3 - taking only the dates that correspond
 
-        dt_object = dt.parse('2000-2-1 00:00')
         date_max = copulae[0].dateM[-1]
         date_min = copulae[0].dateM[0]
 
-        print('date range: %s %s' % (str(dt_object.fromtimestamp(date_min)), str(dt_object.fromtimestamp(date_max))))
+        #print('date range: %s %s' % (str(date_min), str(date_max)))
 
         dates = []
 
@@ -146,11 +144,8 @@ class CopulaManagerMS:
 
         current_indexes = [0 for _ in range(nbSeries)]
         date_indexes = [[] for _ in range(nbSeries)]
-        dates_element = [0 for _ in range(nbSeries)]
+        dates_element = [next(dates[i]) for i in range(nbSeries)]
         dateM = []
-
-        for i in range(nbSeries):
-            dates_element[i] = next(dates[i])
 
         cur = date_min
         while cur < date_max:
@@ -159,7 +154,7 @@ class CopulaManagerMS:
             for i in range(nbSeries):
                 while dates_element[i] < cur:
                     dates_element[i] = next(dates[i])
-                    current_indexes[i] = current_indexes[i] + 1
+                    current_indexes[i] += 1
 
                 if dates_element[i] != cur:
                     b = False
@@ -168,14 +163,14 @@ class CopulaManagerMS:
                 dateM.append(cur)
                 for i in range(nbSeries):
                     date_indexes[i].append(current_indexes[i])
-                cur = cur + 3600
+                cur += timedelta(hours=1)
 
             else:
                 cur_tp = max(dates_element)
                 if cur < cur_tp:
                     cur = cur_tp
                 else:
-                    cur += 3600
+                    cur += timedelta(hours=1)
 
                     ### 4 - retrieving the values (saved in vectM)
         series_to_consider = []
@@ -209,10 +204,10 @@ class CopulaManagerMS:
         self.just_parameters = just_parameters
         self.copulae = copulae
 
+    @property
     def date_range(self):
-        dt_object = dt.parse('2000-1-1 00:00')
-        a = dt_object.fromtimestamp(self.dateM[0]).__str__()
-        b = dt_object.fromtimestamp(self.dateM[-1]).__str__()
+        a = str(self.dateM[0])
+        b = str(self.dateM[-1])
         return (a, b)
 
     def get_corner_points(self, cornerFraction=0.5, endFraction=0.3, visualize=True):
@@ -481,7 +476,7 @@ class CopulaManagerMS:
     def tails(self, precision=30, restrict=None, interpolation='epi_spline'):
         return tails_ut(self.unifM, precision=precision, restrict=restrict, interpolation=interpolation)
 
-    def pprint(self):
+    def __str__(self):
         maxN = 6
         print('\n### SCALAR PARAMETERS ### \n \n')
         print('-> nbSeries= %d \n-> dim= %d' % (self.nbSeries, self.dim))
@@ -500,13 +495,13 @@ class CopulaManagerMS:
                 string += '%d, ' % j
             string = string[:-2]
             string += ']\n'
-            if 'date_range' in par.keys():
-                temp = par['date_range']
-                string += '      date_range: (' + str(temp[0]) + ', ' + str(temp[1]) + ') \n'
-            if 'first_hour' in par.keys():
-                temp = par['first_hour']
-                string += '      first_hour: (' + str(temp[0]) + ', ' + str(temp[1]) + ') \n'
-            if 'forecast' in par.keys():
+            if 'date_range' in par:
+                start_date, end_date = par['date_range']
+                string += '      date_range: (' + str(start_date) + ', ' + str(end_date) + ') \n'
+            if 'first_hour' in par:
+                start_hour, end_hour = par['first_hour']
+                string += '      first_hour: (' + str(start_hour) + ', ' + str(end_hour) + ') \n'
+            if 'forecast' in par:
                 temp = par['forecast']
                 if temp != []:
                     string += '      forecast (len=%d): [' % len(temp)
@@ -516,7 +511,7 @@ class CopulaManagerMS:
                         else:
                             string += '--ERROR--, '
                     string = string[:-2] + ']\n'
-            if 'forecast_d' in par.keys():
+            if 'forecast_d' in par:
                 temp = par['forecast_d']
                 if temp != []:
                     string += '      forecast_d (len=%d): [' % len(temp)
@@ -561,7 +556,10 @@ class CopulaManagerMS:
                 else:
                     string = '%s...]\n' % string
 
-        print(string)
+        return string
+
+    def pprint(self):
+        print(self)
 
 
 ### This adjacent function computes the tail distribution for each corner of the copula specified by unifs

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import dateutil.parser as dt
 import matplotlib.pyplot as plt
 import utilities as ut
@@ -57,23 +59,21 @@ class CopulaManager:
     #                           the offsets (list)
     #                           the window (numerous arguments)
     #                           the kind of data that has been given in argument
-    def __init__(self, arg_date, vect, data, parameters, var_function=None):
+    def __init__(self, dates, vect, data, parameters, var_function=None):
 
-        if isinstance(arg_date[0], int):
-            date = arg_date
+        if isinstance(dates[0], datetime):
+            date = dates
         else:
-            date = [int(dt.parse(i).timestamp()) for i in arg_date]
-        data_keys = data.keys()
+            date = [dt.parse(date) for date in dates]
 
-        print('preparing the data')
+        #print('preparing the data')
         if len(date) == len(vect):
 
             vect_temp = []
             date_temp = []
             data_temp = {}
-            for i in data_keys:
-                data_temp[i] = []
-            dt_object = dt.parse(arg_date[0])
+            for key in data:
+                data_temp[key] = []
 
             vect_it = iter(vect)
             date_it = iter(date)
@@ -90,11 +90,11 @@ class CopulaManager:
                     for key in data.keys():
                         data_temp[key].append(None)
                     date_temp.append(cur)
-                    cur += 3600
+                    cur += timedelta(hours=1)
 
                 while cur > index:
                     print(
-                        'Warning: possibly twice the same entry at date %s' % str(dt_object.fromtimestamp(index)))
+                        'Warning: possibly twice the same entry at date %s' % str(datetime.fromtimestamp(index)))
                     index = next(date_it)
                     next(vect_it)
                     for key in data.keys():
@@ -106,7 +106,7 @@ class CopulaManager:
                     for key in data.keys():
                         data_temp[key].append(next(data_it[key]))
 
-                cur += 3600
+                cur += timedelta(hours=1)
 
             self.vect = vect_temp
             self.date = date_temp
@@ -120,7 +120,7 @@ class CopulaManager:
 
         self.update(parameters)
 
-        print('copula initialized')
+        #print('copula initialized')
 
     ### the update functions update the window to match the parameters arguments
     # returns nothing
@@ -129,84 +129,65 @@ class CopulaManager:
     #   () data: additional data to be taken into account
     def update(self, parameters):
 
-        print('checking the parameters arguments')
-        data_temp = self.data
-        self.check_parameters(parameters, data_temp)
+        #print('checking the parameters arguments')
+        data = self.data
+        self.check_parameters(parameters, data)
         self.define_window()
 
         # initializing the temporary variables
         dim = self.dim
-        vectM_temp = [[] for i in range(dim)]
+        vectM = [[] for _ in range(dim)]
         indexes = []
-        dataM_temp = {}
-        dateM_temp = []
+        dataM = {}
+        dateM = []
 
-        data_keys = self.data.keys()
+        for key in self.data:
+            dataM[key] = [[] for _ in range(dim)]
+        max_offset = max(parameters['offsets'])
 
-        for key in data_keys:
-            dataM_temp[key] = [[] for i in range(dim)]
-        max_offset = max(parameters['offsets']) + 1
-
-        # buffers for the next loop
-        buff = [0 for i in range(max_offset)]
-        buff_ind = 0
-        data_buff = {}
-
-        for i in data_keys:
-            data_buff[i] = buff.copy()
-
-        # variables needed
-        vect_iter = iter(self.vect)
-        date_iter = iter(self.date)
-        data_iter = {}
-        for key in data_keys:
-            data_iter[key] = iter(self.data[key])
-
-        print('selecting the desired points')
+        #print('selecting the desired points')
         # selecting the desired points
 
-        for ind in range(self.length):
-            buff[buff_ind] = next(vect_iter)
-            for key in data_keys:
-                data_buff[key][buff_ind] = next(data_iter[key])
-            buff_ind = (buff_ind + 1) % max_offset
+        for i, date in enumerate(self.date):
 
-            if ind < max_offset - 1:
-                continue
+            if i + max_offset >= self.length:
+                break
 
-            cur = next(date_iter)
+            point = [] # The values of vectM
+            more_data = {} # Dictionary of forecast and forecast_d
 
-            temp = [[], {}]
-            for i in parameters['offsets']:
-                temp[0].append(buff[(i + buff_ind) % max_offset])
+            for offset in parameters['offsets']:
+                point.append(self.vect[i + offset])
 
-            for key in data_keys:
-                temp[1][key] = []
-                for i in parameters['offsets']:
-                    temp[1][key].append(data_buff[key][(i + buff_ind) % max_offset])
+            for key in self.data:
+                more_data[key] = []
+                for offset in parameters['offsets']:
+                    more_data[key].append(data[key][i + offset])
 
-            if self.parameters['window'](temp[0], cur, temp[1]):
+            if self.parameters['window'](point, date, more_data):
 
-                for i in range(dim):
-                    vectM_temp[i].append(temp[0][i])
-                indexes.append(ind - max_offset)
-                for key in temp[1].keys():
-                    for i in range(dim):
-                        dataM_temp[key][i].append(temp[1][key][i])
-                dateM_temp.append(cur)
+                for j, value in enumerate(point):
+                    vectM[j].append(value)
 
-        self.dateM = dateM_temp
-        self.dataM = dataM_temp
-        self.lengthM = len(vectM_temp[0])
+                indexes.append(i)
 
-        # if this is errors in Solar power forecasts, applying reverse variance transformation to get the correct values in vectM
+                for key in more_data:
+                    for j in range(dim):
+                        dataM[key][j].append(more_data[key][j])
+                dateM.append(date)
+
+        self.dateM = dateM
+        self.dataM = dataM
+        self.lengthM = len(vectM[0])
+
+        # if these are errors in Solar power forecasts, applying reverse variance transformation to get the correct values in vectM
         # (variances were scaled to 1 for each solar hour, now we multiply by the variance corresponding
         # to the solar hour of 'predicted_day' with offset)
         if (parameters['type'] == 'Solar') and (parameters['kind'] == 'error'):
-            if ('hour_sol' in data_keys) and (self.var_function is not None):
-                if not 'predicted_day' in parameters.keys():
+            if ('hour_sol' in data) and (self.var_function is not None):
+                if 'predicted_day' not in parameters:
 
-                    if 'date_range' in parameters.keys():
+                    if 'date_range' in parameters:
                         parameters['predicted_day'] = parameters['date_range'][1]
                     else:
                         parameters['predicted_day'] = '2000-01-01 00:00'
@@ -214,22 +195,21 @@ class CopulaManager:
                 time = dt.parse(parameters['predicted_day'])
                 var_sol_temp = []
                 rise, sete = ut.sun_rise_set('%d-%d-%d' % (time.year, time.month, time.day))
-                for i in parameters['offsets']:
+
+                for offset in parameters['offsets']:
                     var_sol_temp.append(self.var_function(
-                        ((i + time.hour + time.minute / 60 + time.second / 3600) - rise) / (sete - rise) * 12))
+                        ((offset + time.hour + time.minute / 60 + time.second / 3600) - rise) / (sete - rise) * 12))
+
                 for i in range(dim):
-                    def f(x):
-                        return x * var_sol_temp[i]
+                    vectM[i] = [x * var_sol_temp[i] for x in vectM[i]]
 
-                    vectM_temp[i] = list(map(f, vectM_temp[i]))
-
-        self.vectM = vectM_temp
+        self.vectM = vectM
         # creating the copula variables
-        print('creating the copula points')
+        #print('creating the copula points')
         indexes = set(indexes)
 
         self.indexes = indexes
-        self.unif = ut.uniforms(vectM_temp, rand=False)
+        self.unif = ut.uniforms(vectM, rand=False)
 
     ### pprint doesn't plot: it just list all the attributes:
     def pprint(self):
@@ -238,11 +218,11 @@ class CopulaManager:
         self.length, self.dim, self.lengthM))
         print('### PRIMARY DATA ### \n \n-> vect (len=%d) [%0.2f, %0.2f, %0.2f, %0.2f, %0.2f, %0.2f...]\n' % (
         len(self.vect), self.vect[0], self.vect[1], self.vect[2], self.vect[3], self.vect[4], self.vect[5]))
-        print('-> date (len=%d) [\'%s\', \'%s\', \'%s\', ...]\n' % (
+        print("-> date (len=%d) ['%s', '%s', '%s', ...]\n" % (
         len(self.date), self.date[0], self.date[1], self.date[2]))
         string = '-> data (len=%d) {' % len(self.data)
         for key in self.data.keys():
-            string += '\'%s\', ' % key
+            string += "'%s', " % key
             string = string[:-2]
         string += '}\n'
         for key in self.data.keys():
@@ -293,7 +273,7 @@ class CopulaManager:
         print('      %r' % self.param_actual)
 
         print('\n \n### SECONDARY DATA ###\n\n')
-        print('-> dateM (len=%d) [\'%s\', \'%s\', \'%s\', ...]\n' % (
+        print("-> dateM (len=%d) ['%s', '%s', '%s', ...]\n" % (
         len(self.dateM), self.dateM[0], self.dateM[1], self.dateM[2]))
         string = 'indexes (len=%d) {' % len(self.indexes)
         incr = 0
@@ -306,22 +286,22 @@ class CopulaManager:
         string = string[:-2] + '...}\n'
         print(string)
 
-        for offset in range(len(self.parameters['offsets'])):
-            print('offset: %d' % self.parameters['offsets'][offset])
+        for i, offset in enumerate(self.parameters['offsets']):
+            print('offset: %d' % offset)
             print('-> vectM (len=%d) [%0.2f, %0.2f, %0.2f, %0.2f, %0.2f, %0.2f...]\n' % (
-            len(self.vectM[offset]), self.vectM[offset][0], self.vectM[offset][1], self.vectM[offset][2],
-            self.vectM[offset][3], self.vectM[offset][4], self.vectM[offset][5]))
+            len(self.vectM[i]), self.vectM[i][0], self.vectM[i][1], self.vectM[i][2],
+            self.vectM[i][3], self.vectM[i][4], self.vectM[i][5]))
             print('-> unif (len=%d) [%0.2f, %0.2f, %0.2f, %0.2f, %0.2f, %0.2f...]\n' % (
-            len(self.unif[offset]), self.unif[offset][0], self.unif[offset][1], self.unif[offset][2],
-            self.unif[offset][3], self.unif[offset][4], self.unif[offset][5]))
+            len(self.unif[i]), self.unif[i][0], self.unif[i][1], self.unif[i][2],
+            self.unif[i][3], self.unif[i][4], self.unif[i][5]))
             string = '-> dataM (len=%d) {' % len(self.dataM)
             for key in self.dataM.keys():
                 string += key + ', '
             string = string[:-2] + '}\n'
-            for key in self.dataM.keys():
-                string += '   ' + key + ' (len=%d) [' % len(self.dataM[key][offset])
-                for i in range(min(6, len(self.dataM[key][offset]))):
-                    string += '%0.2f, ' % self.dataM[key][offset][i]
+            for key in self.dataM:
+                string += '   ' + key + ' (len=%d) [' % len(self.dataM[key][i])
+                for j in range(min(6, len(self.dataM[key][i]))):
+                    string += '%0.2f, ' % self.dataM[key][i][j]
                 string = string[:-2]
                 string += '...]\n'
             print(string)
@@ -345,57 +325,47 @@ class CopulaManager:
     ### This 'window' is then stored in parameters
     def define_window(self):
 
-        dt_obj = dt.parse('2000-1-1 00:00')
-
         if not self.param_actual['window']:
             dim = self.dim
             parameters = self.parameters
             param_actual = self.param_actual
             date_range = None
             if param_actual['date_range']:
-                date_range = [[dt.parse(i).timestamp() for i in j] for j in parameters['date_range']]
+                date_range = [[dt.parse(i) for i in j] for j in parameters['date_range']]
 
             def f(l, date, data={}):
                 b = True
                 if len(l) == dim:
-                    no_none = True;
-                    for i in l:
-                        if i is None:
-                            no_none = False
-                            break
-                    if no_none:
-
-                        if param_actual['date_range']:
-                            good_date = False
-                            for date_tp in date_range:
-                                good_date |= (date_tp[0] <= date <= date_tp[1])
-                                if good_date:
-                                    break
-                            b &= good_date
-
-                        if param_actual['first_hour']:
-                            hour = dt_obj.fromtimestamp(date).hour
-                            temp = parameters['first_hour']
-                            b &= (hour - temp[0]) % 24 <= (temp[1] - temp[0])
-                            # b&=(date-3600*(temp[0]-16))%86400<=(temp[1]-temp[0])*3600
-
-                        if param_actual['forecast']:
-                            for i in range(dim):
-                                b &= parameters['forecast'][i][0] <= data['forecast'][i] <= parameters['forecast'][i][1]
-
-                        if param_actual['forecast_d']:
-                            for i in range(dim):
-                                b &= parameters['forecast_d'][i][0] <= data['forecast_d'][i] <= \
-                                     parameters['forecast_d'][i][1]
-                    if not no_none:
+                    if any(i is None for i in l):
                         return False
+                    if param_actual['date_range']:
+                        good_date = False
+                        for start_time, end_time in date_range:
+                            good_date |= (start_time <= date <= end_time)
+                            if good_date:
+                                break
+                        b &= good_date
+
+                    if param_actual['first_hour']:
+                        hour = date.hour
+                        start_hour, end_hour = parameters['first_hour']
+                        b &= (hour - start_hour) % 24 <= (end_hour - start_hour)
+                        # b&=(date-3600*(temp[0]-16))%86400<=(temp[1]-temp[0])*3600
+
+                    if param_actual['forecast']:
+                        for i in range(dim):
+                            b &= parameters['forecast'][i][0] <= data['forecast'][i] <= parameters['forecast'][i][1]
+
+                    if param_actual['forecast_d']:
+                        for i in range(dim):
+                            b &= parameters['forecast_d'][i][0] <= data['forecast_d'][i] <= \
+                                 parameters['forecast_d'][i][1]
                 else:
-                    raise (RuntimeError('l should be of length %d' % dim))
+                    raise RuntimeError('l should be of length %d' % dim)
                 return b
 
             self.parameters['window'] = f
             self.param_actual['window'] = True
-
 
 ### this function checks that the parameters have the correct types, length, values... before initialization or update.
 def check_param(parameters, data):
@@ -406,8 +376,8 @@ def check_param(parameters, data):
                     'forecast_d': False}
     dim = 0
 
-    print('############ checking parameters ##############')
-    if 'offsets' in keys:
+    #print('############ checking parameters ##############')
+    if 'offsets' in parameters:
         offsets_fine = all([isinstance(offset, int) for offset in parameters['offsets']])
         dim = len(parameters['offsets'])
         offsets_fine &= dim > 0
@@ -424,7 +394,7 @@ def check_param(parameters, data):
     if 'window' in parameters:
         temp = parameters['window']
         try:
-            if type(temp([0.5 for _ in dim], '01/01/2000 01:10')) == bool:
+            if type(temp([0.5 for _ in dim], dt.parse('01/01/2000 01:10'))) == bool:
                 param_actual['window'] = True
                 param_temp['window'] = parameters['window']
         except TypeError:

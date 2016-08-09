@@ -5,8 +5,9 @@ sys.path.append(home_dir+'tests')
 import copula_analysis as ca
 import vines
 from itertools import combinations
+import results
 
-parameter = {'offsets': [14, 17], 'date_range': ('2010-07-01 18:00:00', '2015-06-28 23:00:00'), 'first_hour': (0, 0)}
+parameter = {'offsets': [14, 17], 'date_range': ('2010-07-01 18:00:00', '2016-06-30 23:00:00'), 'first_hour': (0, 0)}
 #titles=[{'type':'Wind','location':'total','kind':'forecast'},{'type':'Wind','location':'NP','kind':'error'},{'type':'Solar','location':'NP','kind':'error'}]
 titles = [{'type': 'Wind', 'location': 'total', 'kind': 'error'}]
 copula=ca.create_copulaManager(titles,parameter)
@@ -19,5 +20,5 @@ combs3b = [lambda unifs, comb=comb: vines.WeightedCopula(unifs, comb, precise=Fa
 #          lambda unifs: vines.D_vine(unifs, list_models=[list_models + combs2, list_models]),
 #          lambda unifs: vines.D_vine(unifs, list_models=[list_models + combs2 + combs3, list_models])]
 models = list_models + combs2 + combs2b + combs3 + combs3b
-res = ca.test_models(copula, list_models=list_models, win_forecast=0.5)
-#results.compile_results(res)
+res = ca.test_models(copula, list_models=models, win_forecast=0.2)
+results.compile_results(res, 'C:\\users\\sabrina\\desktop\\horse_races\\trials')

@@ -975,9 +975,9 @@ class WeightedCopula(cop2d):
         name = 'weighted'
         if not precise:
             name += '_simple'
-        for i in copulas:
-            name = '%s_%s' % (name, i.ACR)
-            self.ACR += '-' + i.ACR
+        for copula in copulas:
+            name += '_' + copula.ACR
+            self.ACR += '-' + copula.ACR
 
         if count > max_models:
             lld = [len(cop.parameter_list()) - cop.log_likelihood(vects) for cop in copulas]
