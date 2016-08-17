@@ -3,6 +3,7 @@ import math
 import sys
 import time
 from datetime import timedelta
+from copy import deepcopy
 
 import copulaMS as cms
 import copulaModels as mod
@@ -27,64 +28,53 @@ def create_copulaManager(titles, parameters_def, list_parameters=None, just_para
     length = len(titles)
     series = []
 
-    good_format = False
-    if (type(titles) == list):
-        if len(titles) > 0:
-            good_format = True
-    if not good_format:
+    if (not isinstance(titles, list)) and (len(titles) > 0):
         raise (RuntimeError('titles must be a list of dictionaries, with length>0'))
-    if not list_parameters is None:
-        if len(list_parameters) != length:
-            raise (RuntimeError('list_parameters must be either None or of same length than titles'))
-    if not just_parameters is None:
-        if len(just_parameters) != length:
-            raise (RuntimeError('just_parameters must be either None or of same length than titles'))
+    if (list_parameters is not None) and (len(list_parameters) != length):
+        raise (RuntimeError('list_parameters must be either None or of same length than titles'))
+    if (just_parameters is not None) and (len(just_parameters) != length):
+        raise (RuntimeError('just_parameters must be either None or of same length than titles'))
 
     opts = {'type': {'Wind', 'Solar'}, 'location': {'NP', 'SP', 'total'}, 'kind': {'error', 'forecast', 'actual'}}
     mandatory_keys = {'type', 'location', 'kind'}
-    for t in titles:
-        good_format = False
-        if type(t) == dict:
-            if set(t.keys()).issubset(mandatory_keys):
-                good_format2 = True
-                for key in mandatory_keys:
-                    if not t[key] in opts[key]:
-                        good_format2 = False
-                good_format = good_format2
-    if not good_format:
-        raise (RuntimeError('please check the arguments specifying the kind of data'))
-
-    for i in range(length):
-        t = titles[i]
-        index = titles.index(t)
-        if index < i:
-            temp = {}
-            for key in series[index].keys():
-                temp[key] = series[index][key].copy()
-            series.append(temp)
+    for title in titles:
+        if isinstance(title, dict) and set(title.keys()).issubset(mandatory_keys):
+            for key in mandatory_keys:
+                if title[key] not in opts[key]:
+                    raise RuntimeError('please check the arguments specifying the kind of data')
         else:
-            temp = {}
-            res = get_data(type=t['type'], location=t['location'])
-            if t['type'] == 'Solar':
+            raise RuntimeError('please check the arguments specifying the kind of data')
+
+    for i, title in enumerate(titles):
+        index = titles.index(title)
+        if index < i: # if repeat of title?
+            serie = {}
+            for key in series[index]:
+                serie[key] = series[index][key].copy()
+            series.append(serie)
+        else:
+            serie = {}
+            res = get_data(type=title['type'], location=title['location'])
+            if title['type'] == 'Solar':
                 # call to take into account the importance of solar hour in solar power forecast errors
                 res2 = ut.prepare_solar(res, visualize=False)
-                temp['date'] = res2['date']
-                temp['vect'] = res2[t['kind']]
-                temp['data'] = {'forecast': res2['for'], 'forecast_d': ut.list_derivative(res2['for']),
+                serie['date'] = res2['date']
+                serie['vect'] = res2[title['kind']]
+                serie['data'] = {'forecast': res2['for'], 'forecast_d': ut.list_derivative(res2['for']),
                                 'hour_sol': res2['hour_sol']}
-                temp['var_function'] = res2['var_function']
+                serie['var_function'] = res2['var_function']
             else:
-                temp['date'] = res['date']
-                temp['var_function'] = None
-                if t['kind'] == 'error':
-                    temp['vect'] = [actual - forecast for (actual, forecast) in zip(res['act'], res['for'])]
-                elif t['kind'] == 'forecast':
-                    temp['vect'] = res['for']
+                serie['date'] = res['date']
+                serie['var_function'] = None
+                if title['kind'] == 'error':
+                    serie['vect'] = [actual - forecast for (actual, forecast) in zip(res['act'], res['for'])]
+                elif title['kind'] == 'forecast':
+                    serie['vect'] = res['for']
                 else:
-                    temp['vect'] = res['act']
-                temp['data'] = {'forecast': res['for'], 'forecast_d': ut.list_derivative(res['for'])}
-            temp['title'] = t
-            series.append(temp)
+                    serie['vect'] = res['act']
+                serie['data'] = {'forecast': res['for'], 'forecast_d': ut.list_derivative(res['for'])}
+            serie['title'] = title
+            series.append(serie)
 
     return cms.CopulaManagerMS(series, parameters_def, list_parameters=list_parameters, just_parameters=just_parameters)
 
@@ -96,11 +86,13 @@ def create_copulaManager(titles, parameters_def, list_parameters=None, just_para
 #      that should be taken into account. (if=45, it translates into 91 days in the past years and 45 in the current year)
 #   () win_forecast is a window parameter specifying the width of the forecast window: if q=CDF_forecast(current_forecast),
 #      we will consider dates at which the forecast was in [CDF^-1(q-'win_forecast'),CDF^-1(q+'win_forecast')]
-def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, win_forecast=0.2, visualize=False,
-                start_incr=None, end_incr=None,
-                keep_vec=False, compare_dist=False):
+def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, win_forecast=0.2,
+                start_incr=None, end_incr=None, compare_dist=False):
     min_points = 30
     win_days = max(min_points, win_days)
+
+    if start_incr is None:
+        start_incr = win_days
 
     start_time = time.time()
 
@@ -116,8 +108,6 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
     # initializing variables
     parameters = copula.parameters
     nb_series = len(copula.copulae)
-    start_serie = [0]
-    start_serie.extend(np.cumsum([copula.copulae[i].dim for i in range(nb_series)])[:-1])
     forecasts = [copula.dataM[i]['forecast'][0] for i in range(nb_series)]
     errors = copula.vectM
     dates = copula.dateM
@@ -125,16 +115,13 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
     print('forecasts (%d) %r\nerrors (%d) %r\ndates (%d) %r' % (len(forecasts[0]), forecasts[0][:8],
                                                                 len(errors), errors[:8], len(dates), dates[:8]))
 
-    ### BIG LOOP ###
-
-
     incr = 0
     first = True
     last_time = time.time()
     res = {'len': [], 'log': [], 'rank': [], 'problem': [], 'past_log': [], 'selected_model': [],
-           'proj_emd': [], 'proj_quantile': [], 'wei_par': [], 'date': []}
+           'proj_emd': [], 'proj_quantile': [], 'wei_par': [], 'dates': []}
 
-    res['parameters'] = parameters[0]
+    res['parameters'] = deepcopy(parameters[0])
     res['parameters'].update({'win_days': win_days, 'win_forecast': win_forecast, 'repeat_win_days': repeat_win_days})
 
     # loop over each considered hour: each time,
@@ -145,12 +132,8 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
 
         # selecting the observation range
         incr += 1
-        if start_incr is None:
-            if incr < win_days:
-                continue
-        else:
-            if incr < start_incr:
-                continue
+        if incr < start_incr:
+            continue
         if end_incr is not None:
             if incr >= end_incr:
                 continue
@@ -172,115 +155,114 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
         last_time = print_info(last_time=last_time)
 
         observations = select_observations(copula, date, repeat_win_days=repeat_win_days,
-                                           win_days=win_days, win_forecast=win_forecast)
+                                           win_days=win_days, win_forecast=win_forecast, param_fixed=param_fixed)
 
         if copula.lengthM < min_points:
-            print('Error updating copula at incr %d' % incr)
-            return None
+            print('Error updating copula at incr %d, too few points' % incr, file=sys.stderr)
+            continue
 
         if observations is None:
             continue
         else:
             vects, unifs = observations
 
+        # fitting models to the distribution
+        # print('fitting models to the distribution')
+        length = len(vects[0])
+        dim = len(vects)
 
+        # creating the density of a fitted gaussian
+        densities = [ut.create_gaussian_density(vects)]
 
-        try:
-                ### fitting models to the distribution
-            #print('fitting models to the distribution')
-            length = len(vects[0])
-            dim = len(vects)
+        # creating a list of copula models
+        if list_models is None:
+            list_models = [mod.cop_gaussian, mod.cop_student]
+        models = []
+        for i, model in enumerate(list_models):
+            # print('\n### %d th model###' % i)
+            created = model(unifs)
+            models.append(created)
+            if created.ACR == 'WE':
+                res['wei_par'].append(created.get_names())
 
-            # creating the density of a fitted gaussian
-            densities = [ut.create_gaussian_density(vects)]
-
-            # creating a list of copula models
-            if list_models is None:
-                list_models = [mod.cop_gaussian, mod.cop_student]
-            models = []
-            for i, model in enumerate(list_models):
-                #print('\n### %d th model###' % i)
-                created = model(unifs)
-                models.append(created)
-                if created.ACR == 'WE':
-                    res['wei_par'].append(created.get_names())
-
-            # computing the densities of the models, their log-likelihood, and selecting the 'best candidate'
-            names = ['gaussian distribution']
-            cop_densities = []
-            best_model_past = models[0]
-            best_log_past = 0
-            log_past = []
-            for model in models:
-                if first:
-                    names.append(model.name)
-                cop_densities.append(model.pdf)
-                lld = sum([np.log(k) for k in model.pdf(unifs)])
-                log_past.append(lld)
-                if lld > best_log_past:
-                    best_log_past = lld
-                    best_model_past = model
-
-            names.append('selected model')
-            cop_densities.append(best_model_past.pdf)
-            log_past.append(best_log_past)
-
-            res['past_log'].append(log_past)
-            res['selected_model'].append(best_model_past.name)
+        # computing the densities of the models, their log-likelihood, and selecting the 'best candidate'
+        names = ['gaussian distribution']
+        cop_densities = []
+        best_model_past = models[0]
+        best_log_past = 0
+        log_past = []
+        for model in models:
             if first:
-                res['names'] = names
-                first = False
+                names.append(model.name)
+            cop_densities.append(model.pdf)
+            lld = sum([np.log(k) for k in model.pdf(unifs)])
+            log_past.append(lld)
+            if lld > best_log_past:
+                best_log_past = lld
+                best_model_past = model
 
-            # computing the rank of 'obs' among the window points
-            CDFs = ut.marginals_cdf(vects)
-            rank = [float(CDFs[i](error[i])) for i in range(dim)]
+        names.append('selected model')
+        cop_densities.append(best_model_past.pdf)
+        log_past.append(best_log_past)
 
+        res['past_log'].append(log_past)
+        res['selected_model'].append(best_model_past.name)
+        if first:
+            res['names'] = names
+            first = False
 
-            ### computing the tail metrics:
-            C_to_D = ut.copula_to_distribution(vects)
-            simulations = [cop.simulate(10000) for cop in models]
-            for i in range(len(models)):
-                if not 0 < np.min(simulations[i]) < np.max(simulations[i]) < 1:
-                    print(i)
-                    print(simulations[i])
-                    print(copula.lengthM)
-                    print(models[i].print_names())
-                    print(models[i].print_par())
-                    return models[i]
-            simulations = list(map(C_to_D, simulations))
-            tail_metrics = ut.compare_tails(simulations, vects, error, quantile=0.1)
-            res['proj_emd'].append(tail_metrics[0])
-            res['proj_quantile'].append(tail_metrics[1])
+        # computing the rank of 'obs' among the window points
+        CDFs = ut.marginals_cdf(vects)
+        rank = [float(CDFs[i](error[i])) for i in range(dim)]
 
+        # computing the tail metrics:
+        C_to_D = ut.copula_to_distribution(vects)
+        simulations = [cop.simulate(10000) for cop in models]
 
-            ### computing the log likelihood ###
-            try:
-                if compare_dist:
-                    res_log = [np.log(den(error)[0]) for den in densities]
-                    res_log.extend(
-                        [den(error)[0] for den in ut.copula_to_densities(vects, cop_densities, log_return=True)])
-                else:
-                    res_log = [den(rank)[0] for den in
-                               ut.distribution_to_copula_densities(vects, densities, log_return=True)]
-                    res_log.extend([np.log(den([[r] for r in rank])[0]) for den in cop_densities])
+        """
+        for i in range(len(models)):
+            if not 0 < np.min(simulations[i]) < np.max(simulations[i]) < 1:
+                print(i)
+                print(simulations[i])
+                print(copula.lengthM)
+                print(models[i].print_names())
+                print(models[i].print_par())
+                return models[i]
+        """
 
-                res['log'].append(res_log)
-            except:
-                res['log'].append(None)
-                res['problem'].append('incr: %d, problem in the log: %r' % (incr, sys.exc_info()[0]))
+        simulations = [C_to_D(sim) for sim in simulations]
+        tail_metrics = ut.compare_tails(simulations, vects, error, quantile=0.1)
+        res['proj_emd'].append(tail_metrics[0])
+        res['proj_quantile'].append(tail_metrics[1])
 
-            res['len'].append(length)
-            res['rank'].append(rank)
-            res['date'].append(str(date))
+        # computing the log likelihood
+        try:
+            if compare_dist:
+                res_log = [np.log(den(error)[0]) for den in densities]
+                res_log.extend(
+                    [den(error)[0] for den in ut.copula_to_densities(vects, cop_densities, log_return=True)])
+            else:
+                res_log = [den(rank)[0] for den in
+                           ut.distribution_to_copula_densities(vects, densities, log_return=True)]
+                res_log.extend([np.log(den([[r] for r in rank])[0]) for den in cop_densities])
+
+            res['log'].append(res_log)
         except:
-            res['problem'].append('incr %d general problem: %r' % (incr, sys.exc_info()[0]))
-            print(incr, sys.exc_info()[0], file=sys.stderr)
+            res['log'].append(None)
+            res['problem'].append('incr: %d, problem in the log: %r' % (incr, sys.exc_info()[0]))
+
+        res['len'].append(length)
+        res['rank'].append(rank)
+        res['dates'].append(date)
+
+            #res['problem'].append('incr %d general problem: %r' % (incr, sys.exc_info()[0]))
+            #print(incr, sys.exc_info()[0], file=sys.stderr)
 
     copula.update(param_fixed[0], list_parameters=param_fixed)
     return res
 
 
-### Visualization and printing of the results
+# Visualization and printing of the results
 def visualize_result(res, add_title='', save=True, quantile=0.1):
     nb_models = len(res['names']) - 2
     length = len(res['log'])
@@ -374,20 +356,14 @@ def visualize_result(res, add_title='', save=True, quantile=0.1):
     return titles, comparisons, designations, winner_list
 
 
-def select_observations(copula, date, repeat_win_days=False, win_days=90, win_forecast=0.2):
+def select_observations(copula, date, repeat_win_days=False, win_days=90, win_forecast=0.2, param_fixed=None):
     if isinstance(date, str):
         date = dt.parse(date)
 
-    param_fixed = []
-    for par in copula.parameters:
-        dic = {}
-        dic['date_range'] = par['date_range']
-        dic['offsets'] = par['offsets']
-        dic['first_hour'] = par['first_hour']
-        param_fixed.append(dic)
 
     nb_series = len(copula.copulae)
     parameters = copula.parameters
+    original_parameters = deepcopy(parameters)
     min_points = 30
     index = copula.dateM.index(date)
     forecast = [copula.dataM[i]['forecast'][0][index] for i in range(nb_series)]
@@ -400,12 +376,7 @@ def select_observations(copula, date, repeat_win_days=False, win_days=90, win_fo
         else:
             parameters[ser]['date_range'] = ut.intersect_dates(param_fixed[0]['date_range'], date, win_days)
 
-    try:
-        copula.update(parameters[0], list_parameters=parameters)
-    except:
-        print('Error updating copula')
-        return None
-
+    copula.update(parameters[0], list_parameters=parameters)
 
     forecast_tp = [copula.dataM[i]['forecast'][0] for i in range(nb_series)]
     for i in range(nb_series):
@@ -429,7 +400,7 @@ def select_observations(copula, date, repeat_win_days=False, win_days=90, win_fo
     indexes = get_indexes()
     vects = [list(map(copula.vectM[i].__getitem__, indexes)) for i in range(copula.dim)]
     unifs = ut.uniforms(vects, rand=False)
-    copula.update(param_fixed[0], list_parameters=param_fixed)
+    copula.update(original_parameters[0])
     return vects, unifs
 
 
@@ -487,7 +458,7 @@ def copula_evolution(copula, win_days=45, day_interval=60, nb_max=5, method='col
             break
 
         bound = start + relativedelta(days=win_days)
-        par[0]['date_range'] = (start.__str__(), bound.__str__())
+        par[0]['date_range'] = (str(start), str(bound))
         copula.update(par[0], list_parameters=par)
 
         if uniforms:
@@ -526,8 +497,6 @@ def copula_evolution(copula, win_days=45, day_interval=60, nb_max=5, method='col
         elif method == 'None':
             pass
         elif method == 'same_color':
-            date_start = copula.dateM[0]
-            date = [(j - date_start) / 86400 for j in copula.dateM]
             fig_num = plt.figure().number
             plt.scatter(vector[0], vector[1])
             plt.xlim(low_all, high_all)
@@ -541,7 +510,7 @@ def copula_evolution(copula, win_days=45, day_interval=60, nb_max=5, method='col
 
         if method == 'color':
             date_start = copula.dateM[0]
-            date = [(j - date_start) / 86400 for j in copula.dateM]
+            date = [(date.timestamp() - date_start.timestamp()) / 86400 for date in copula.dateM]
             fig_num = plt.figure().number
             plot = plt.scatter(vector[0], vector[1], c=date, cmap='bwr')
             plt.xlim(low, high)

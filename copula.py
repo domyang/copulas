@@ -25,7 +25,7 @@ class CopulaManager:
     #                           the offsets (list)
     #                           the window (numerous arguments)
     #                           the kind of data that has been given in argument
-    parameters = {"offsets": [], 'predicted_day': '2000-01-01 00:00',
+    parameters = {"offsets": [], 'predicted_day': dt.parse('2000-01-01 00:00'),
                   'date_range': ('', ''), 'first_hour': (-11, 12), 'forecast': [], 'forecast_d': [],
                   'type': 'Wind', 'location': 'total', 'kind': 'error'}
 
@@ -87,23 +87,22 @@ class CopulaManager:
 
                 while cur < index:
                     vect_temp.append(None)
-                    for key in data.keys():
+                    for key in data:
                         data_temp[key].append(None)
                     date_temp.append(cur)
                     cur += timedelta(hours=1)
 
                 while cur > index:
-                    print(
-                        'Warning: possibly twice the same entry at date %s' % str(datetime.fromtimestamp(index)))
+                    print('Warning: possibly twice the same entry at date %s' % str(index))
                     index = next(date_it)
                     next(vect_it)
-                    for key in data.keys():
+                    for key in data:
                         next(data_it[key])
 
                 if cur == index:
                     date_temp.append(index)
                     vect_temp.append(next(vect_it))
-                    for key in data.keys():
+                    for key in data:
                         data_temp[key].append(next(data_it[key]))
 
                 cur += timedelta(hours=1)
@@ -132,6 +131,7 @@ class CopulaManager:
         #print('checking the parameters arguments')
         data = self.data
         self.check_parameters(parameters, data)
+        parameters = self.parameters
         self.define_window()
 
         # initializing the temporary variables
@@ -188,11 +188,11 @@ class CopulaManager:
                 if 'predicted_day' not in parameters:
 
                     if 'date_range' in parameters:
-                        parameters['predicted_day'] = parameters['date_range'][1]
+                        parameters['predicted_day'] = parameters['date_range'][0][1]
                     else:
-                        parameters['predicted_day'] = '2000-01-01 00:00'
+                        parameters['predicted_day'] = dt.parse('2000-01-01 00:00')
 
-                time = dt.parse(parameters['predicted_day'])
+                time = parameters['predicted_day']
                 var_sol_temp = []
                 rise, sete = ut.sun_rise_set('%d-%d-%d' % (time.year, time.month, time.day))
 
@@ -331,7 +331,7 @@ class CopulaManager:
             param_actual = self.param_actual
             date_range = None
             if param_actual['date_range']:
-                date_range = [[dt.parse(i) for i in j] for j in parameters['date_range']]
+                date_range = parameters['date_range']
 
             def f(l, date, data={}):
                 b = True
@@ -407,7 +407,7 @@ def check_param(parameters, data):
                 if len(date_range) == 2:
                     if type(date_range[0]) == type(date_range[1]) == str:
                         param_actual['date_range'] = True
-                        param_temp['date_range'] = [parameters['date_range']]
+                        param_temp['date_range'] = [[dt.parse(date) for date in parameters['date_range']]]
             if type(date_range) in {list, tuple, set}:
                 b = True
                 for date in date_range:
@@ -422,7 +422,7 @@ def check_param(parameters, data):
                         break
                 if b:
                     param_actual['date_range'] = True
-                    param_temp['date_range'] = parameters['date_range']
+                    param_temp['date_range'] = [[dt.parse(date) for date in dates] for dates in parameters['date_range']]
 
             if not param_actual['date_range']:
                 print('Warning: "parameters[\'date_range\']" should be of type (str,str)')
@@ -449,7 +449,7 @@ def check_param(parameters, data):
                 b_bis = False
                 if isinstance(forecast, tuple):
                     if len(forecast) == 2:
-                        if (type(forecast[0]) in {float, int}) and (type(forecast[1]) in {float, int}):
+                        if isinstance(forecast[0], (float, int)) and isinstance(forecast[1], (float, int)):
                             b_bis = True
                 b &= b_bis
         param_actual['forecast'] = b
@@ -469,7 +469,7 @@ def check_param(parameters, data):
                 b_bis = False
                 if isinstance(forecast_d, tuple):
                     if len(forecast_d) == 2:
-                        if (type(forecast_d[0]) in {float, int}) and (type(forecast_d[1]) in {float, int}):
+                        if isinstance(forecast_d[0], (float, int)) and isinstance(forecast_d[1], (float, int)):
                             b_bis = True
                 b &= b_bis
         param_actual['forecast_d'] = b
@@ -477,9 +477,14 @@ def check_param(parameters, data):
             param_temp['forecast_d'] = parameters['forecast_d']
         else:
             print('Warning: "parameters[\'forecast_d\']" should be of type (float,float)')
-        if param_actual['forecast_d'] & (not 'forecast_d' in data.keys()):
+        if param_actual['forecast_d'] and ('forecast_d' not in data):
             param_actual['forecast_d'] = False
             print('Warning: you need to give the forecast derivative in the data to use it as a window parameter')
+
+    if 'predicted_day' in parameters:
+        if isinstance(parameters['predicted_day'], datetime):
+            param_temp['predicted_day'] = parameters['predicted_day']
+            param_actual['predicted_day'] = True
 
     # checking informative arguments
 

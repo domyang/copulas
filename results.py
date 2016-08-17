@@ -6,20 +6,50 @@ import matplotlib.pyplot as plt
 import numpy as np
 import utilities as ut
 from scipy import stats
+import dateutil.parser as dt
+
+from copula_analysis import select_observations
+from vines import cop2d_gumbel, cop2d_frank, cop2d_uniform, cop2d_gaussian, cop2d_clayton, cop2d_student
 
 simple_copulas = ['frank', 'gumbel', 'uniform', 'gaussian', 'student', 'clayton']
 simple_copulas.sort()
 
+copula_constructors = [cop2d_clayton, cop2d_frank, cop2d_gaussian, cop2d_gumbel, cop2d_student]
+
+class Event:
+    def __init__(self, names, date, logs, quantile, emd):
+        self.names = names
+        self.date = date
+        self.logs = logs
+        self.quantile = quantile
+        self.emd = emd
+
+    def log_by_name(self, name):
+        name_index = self.names.index(name)
+        return self.logs[name_index]
+
+    def __str__(self):
+        return "Event: {}".format(self.date)
+
+    __repr__ = __str__
 
 class Results:
-    def __init__(self, results_dict):
+    def __init__(self, results_dict, manager=None):
+        self.manager = manager
         self.nb_models = nb_models = len(results_dict['names']) - 2
         self.length = length = len(results_dict['log'])
         self.dim = dim = int(np.log(np.shape(results_dict['proj_quantile'])[2]) / np.log(2)) + 1
         self.proj_quantile = results_dict['proj_quantile']
         self.proj_emd = results_dict['proj_emd']
+        self.ranks = results_dict['rank']
         self.log = results_dict['log']
         self.names = results_dict['names']
+        self.dates = results_dict['date']
+        self.parameters = results_dict['parameters']
+        self.events = [Event(self.names, date, logs, quantile, emd) for date, logs, quantile, emd in zip(self.dates,
+                                                                                                         self.log,
+                                                                                                         self.proj_quantile,
+                                                                                                         self.proj_emd)]
         for key in results_dict:
             setattr(self, key, results_dict[key])
 
@@ -31,6 +61,13 @@ class Results:
 
         control = [(i + 1) / (length + 1) for i in range(length)]
         self.emd_vec = [[ut.univariate_EMD_in_tails(j, control, quantile=0.1) for j in i] for i in vec]
+
+        self.mean_log_likelihood = np.mean(self.log, 0)
+        self.emd_fit_all = np.mean(np.mean(np.mean(self.proj_emd, 0), 1), 1)
+        self.emd_fit_main = [i[-1] for i in np.mean(np.mean(self.proj_emd, 0), 2)]
+        self.emd_all = np.mean(np.mean(self.emd_vec, 0), 1)
+        self.emd_low = [i[0] for i in self.emd_vec[-1]]
+        self.emd_up = [i[1] for i in self.emd_vec[-1]]
 
         self.attrs = ['log-likelihood', 'EMD fit all', 'EMD fit main', 'EMD all', 'EMD low', 'EMD up']
 
@@ -60,6 +97,77 @@ class Results:
                 'EMD low': self.emd_low[name_index],
                 'EMD up': self.emd_up[name_index]}
 
+    def get_event(self, date):
+        if isinstance(date, str):
+            date = dt.parse(date)
+
+        date_index = self.dates.index(str(date))
+        return self.events[date_index]
+
+    def get_range(self, start_date, end_date):
+        if isinstance(start_date, str):
+            start_date = dt.parse(start_date)
+        if isinstance(end_date, str):
+            end_date = dt.parse(end_date)
+
+        start_index = self.dates.index(str(start_date))
+        end_index = self.dates.index(str(end_date))
+        return self.events[start_index:end_index+1]
+
+
+    def plot_day(self, date, simple=False):
+        if self.manager is None:
+            raise RuntimeError("Results object must have associated Copula Manager to retrieve data")
+
+        if isinstance(date, str):
+            date = dt.parse(date)
+
+        _, unifs = select_observations(self.manager, date, win_days=self.parameters['win_days'],
+                                       win_forecast=self.parameters['win_forecast'])
+
+        ut.hist3D(*unifs, bins=10)
+
+        date_index = self.dates.index(str(date))
+        point = self.ranks[date_index]
+
+        plt.figure()
+        plt.scatter(*unifs)
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.title("{} win_days: {} win_forecast: {}".format(date, self.parameters['win_days'],
+                                                            self.parameters['win_forecast']))
+        plt.plot(*point, color='r', marker='x')
+
+        if simple:
+            for name, copula in zip(simple_copulas, copula_constructors):
+                model = copula(unifs)
+                ut.curve3d(model.pdf, points=False, title=name)
+
+    def log_plot(self, start_date=None, end_date=None):
+        if start_date is None:
+            start_date = self.dates[0]
+        if end_date is None:
+            end_date = self.dates[-1]
+
+        if isinstance(start_date, str):
+            start_date = dt.parse(start_date)
+        if isinstance(end_date, str):
+            end_date = dt.parse(end_date)
+
+        start_index = self.dates.index(str(start_date))
+        end_index = self.dates.index(str(end_date))
+        plt.figure()
+        lines = []
+        for i, copula in enumerate(self.names[1:7]):
+            logs = list(zip(*self.log))[i+1][start_index:end_index+1]
+            lines.extend(plt.plot(list(map(dt.parse, self.dates))[start_index:end_index+1], logs, label=copula))
+        plt.ylabel("Log-Likelihood")
+        plt.xlabel("Date")
+        plt.legend(handles=lines, loc=0)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.title("{} - {} Log Likelihood".format(start_date, end_date))
+
     def general_table(self, simple=True, title=None):
         rows = []
         if simple:
@@ -69,14 +177,13 @@ class Results:
 
         name_stats = {name: self.stats_by_name(name) for name in names}
 
-        attrs = ['log-likelihood', 'EMD fit all', 'EMD fit main', 'EMD all', 'EMD low', 'EMD up']
-        for attr in attrs:
+        for attr in self.attrs:
             row = []
             for name in names:
                 row.append("{:7.4f}".format(name_stats[name][attr]))
             rows.append(row)
 
-        return ut.table_latex(rows, xlabels=names, ylabels=attrs, title=title)
+        return ut.table_latex(rows, xlabels=names, ylabels=self.attrs, title=title)
 
     def winner_table(self, attr, simple=False, upto=10):
         rows = []
@@ -108,30 +215,8 @@ class Results:
                     ylabels.append(int(self.ranks_by_name(name)[attr]))
         return ut.table_latex(rows, ylabels=ylabels, xlabels=["Model", attr])
 
-    @property
-    def mean_log_likelihood(self):
-        return np.mean(self.log, 0)
-
-    @property
-    def emd_fit_all(self):
-        return np.mean(np.mean(np.mean(self.proj_emd, 0), 1), 1)
-
-    @property
-    def emd_fit_main(self):
-        return [i[-1] for i in np.mean(np.mean(self.proj_emd, 0), 2)]
-
-    @property
-    def emd_all(self):
-        return np.mean(np.mean(self.emd_vec, 0), 1)
-
-    @property
-    def emd_low(self):
-        return [i[0] for i in self.emd_vec[-1]]
-
-    @property
-    def emd_up(self):
-        return [i[1] for i in self.emd_vec[-1]]
-
+    def __iter__(self):
+        return iter(self.events)
 
 def compile_results(results_dict, dir_name=None):
     if dir_name is None:  # Only used if the parameters key exists
@@ -209,6 +294,7 @@ def merge_results(*results):
             new_results[]
 """
 
+
 def log_table(list_of_results):
     table = 'Trial #: '
     for name in list_of_results[0]['names'][1:-1]:
@@ -222,11 +308,13 @@ def log_table(list_of_results):
 
     return table
 
+
 def averages(list_of_results):
     average_results = []
     for trial in list_of_results:
         average_results.append(np.mean(trial['log'], 0).tolist())
     return list(zip(*average_results))
+
 
 def rank_table(names, values):
     table = 'Trial #: '
@@ -235,13 +323,14 @@ def rank_table(names, values):
     table += '\n'
     for i, trial in enumerate(values[0]):
         table += '{:<9}'.format(i)
-        row = [-col[i] for col in values] # negative to reverse order
+        row = [-col[i] for col in values]  # negative to reverse order
         ranks = stats.rankdata(row)
         for rank in ranks:
             table += '{:>7d} '.format(int(rank))
         table += '\n'
 
     return table
+
 
 def join_results(list_of_results):
     new_results = list_of_results[0].copy()
@@ -250,6 +339,7 @@ def join_results(list_of_results):
             new_results[name].extend(result[name])
 
     return new_results
+
 
 def get_emds(res):
     emds = res['proj_emd']
@@ -260,6 +350,7 @@ def get_emds(res):
         new_emds[i].append([emds[j][i][1][0] for j in range(len(emds))])
         new_emds[i].append([emds[j][i][1][1] for j in range(len(emds))])
     return new_emds
+
 
 def z_interval(data, variance, confidence=.95):
     xbar = np.mean(data)
@@ -274,12 +365,15 @@ def t_interval(data, confidence=.95):
     moe = stats.t.ppf((1+confidence)/2, N - 1) * np.sqrt(var/N)
     return xbar - moe, xbar + moe
 
+
 def fix_name(name):
     if name.startswith('weighted_ST'):
         return name.replace('ST', 'UN', 1)
 
+
 def mean_difference(data):
     return np.mean([x - y for (x,y) in zip(data, data[1:])])
+
 
 def ranks(winner_lists):
     winner_ranks = {}

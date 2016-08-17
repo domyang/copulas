@@ -4,7 +4,7 @@ from scipy import stats
 import math
 import utilities as ut
 import copula as cop
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 # READ ME:
 #
@@ -39,100 +39,93 @@ class CopulaManagerMS:
     date = []
     indexes = [[]]
 
-    ### initialisation: this will create single-series copula managers and aggregate their data
-    ### 1 - a few necessary checks and initialisations
-    ### 2 - creation of the single series copula-managers
-    ### 3 - taking only the dates that correspond
-    ### 4 - retrieving the values (saved in vectM)
-    ### 5 - computing the copula points again
+    # initialisation: this will create single-series copula managers and aggregate their data
+    # 1 - a few necessary checks and initialisations
+    # 2 - creation of the single series copula-managers
+    # 3 - taking only the dates that correspond
+    # 4 - retrieving the values (saved in vectM)
+    # 5 - computing the copula points again
     # arguments:
     #   () series: specifies the data - FORMAT: [ {'date':[],'vect':[],'data':{...},'title':{} }, ...] WITH:
     #                                   ... 'data' : {'forecast':[],'forecast_d':[]}
     #                                   ... 'title' : {'type':'', 'location':'', 'kind':''}
     #   () parameters_def : default parameters which specifies the window
     #   () list_parameters : a list of dictionaries (->parameters for each element of series) overriding the default
-    #   () just_parameters : boolean list; if true, means that the corresponding element of series must only be used to build the window
+    #   () just_parameters : boolean list; if true, the corresponding element of series is only used to build the window
     def __init__(self, series, parameters_def, list_parameters=None, just_parameters=None):
-        self.parameters = []
-        for i in series:
-            self.parameters.append(i['title'])
-        self.update(parameters_def, list_parameters=list_parameters, just_parameters=just_parameters, create=True,
-                    series=series)
+        self.parameters = [ser['title'] for ser in series]
 
-    def update(self, parameters_def, list_parameters=None, just_parameters=None, create=False, series=None):
-        ### 1 - a few necessary checks and initialisations
+        if series is None:
+            raise (RuntimeError("you need to give a 'series' argument to create a copulaManager"))
+
+        self.nbSeries = nbSeries = len(series)
+        if nbSeries < 1:
+            raise (RuntimeError('Series should contain at least 1 element'))
+        for ser in series:
+            if not {'date', 'vect', 'data', 'title'}.issubset(ser.keys()):
+                raise (RuntimeError(
+                    "each element of series should have at least these entry key: {'date','vect','data','title'}"))
+
+        self.parameters = [parameters_def.copy() for _ in range(nbSeries)]
+
+        for i in range(nbSeries):
+            for key in series[i]['title']:
+                self.parameters[i][key] = series[i]['title'][key]
+
+        copulae = []
+        for i, ser in enumerate(series):
+            # print('%r\n%r\n%r\n%r'% (ser['date'],ser['vect'],ser['data'],par[i]))
+            copulae.append(
+                cop.CopulaManager(ser['date'], ser['vect'], ser['data'], self.parameters[i],
+                                  var_function=ser['var_function']))
+        self.copulae = copulae
+
+        self.update(parameters_def, list_parameters=list_parameters, just_parameters=just_parameters)
+
+    def update(self, parameters_def, list_parameters=None, just_parameters=None):
+        # 1 - a few necessary checks and initialisations
         if just_parameters is None:
             just_parameters = self.just_parameters
 
-        if create and (series is None):
-            raise (RuntimeError("you need to give a 'series' argument to create a copulaManager"))
-
-        if create:
-            nbSeries = len(series)
-            self.nbSeries = nbSeries
-            if nbSeries < 1:
-                raise (RuntimeError('Series should contain at least 1 element'))
-            for ser in series:
-                if not {'date', 'vect', 'data', 'title'}.issubset(ser.keys()):
-                    raise (RuntimeError(
-                        "each element of series should have at least these entry key: {'date','vect','data','title'}"))
-        else:
-            nbSeries = self.nbSeries
+        nbSeries = self.nbSeries
 
         if just_parameters is None:
             just_parameters = [False] * nbSeries
 
-        par = []
-        for i in range(nbSeries):
-            par.append(parameters_def.copy())
+        par = [parameters_def.copy() for _ in range(nbSeries)]
 
         if list_parameters is not None:
             if (not isinstance(list_parameters, list)) or (len(list_parameters) != self.nbSeries):
                 print(
-                    "WARNING: list_parameters should be either None or a list same length as series; it won't be considered")
+                    "WARNING: list_parameters should be either None or a list same length as series")
                 list_parameters = None
 
         if list_parameters is not None:
             for j in range(nbSeries):
                 i = list_parameters[j]
-                if i is not None:
-                    if isinstance(i, dict):
-                        par[j] = i
+                if i is not None and isinstance(i, dict):
+                    par[j] = i
 
         for i in range(nbSeries):
-            if create:
-                for key in series[i]['title']:
-                    par[i][key] = series[i]['title'][key]
-            else:
-                for key in {'type', 'location', 'kind'}:
-                    par[i][key] = self.parameters[i][key]
+            for key in {'type', 'location', 'kind'}:
+                par[i][key] = self.parameters[i][key]
             # defines sub_parameters in case the serie's offsets are an empty list
             if (not isinstance(par[i]['offsets'], list)) or (len(par[i]['offsets']) == 0):
                 par[i]['offsets'] = [0]
                 just_parameters[i] = True
 
-                ### 2 - creation of the single series copula-managers
-        if create:
-            copulae = []
-            for i in range(nbSeries):
-                ser = series[i]
-                # print('%r\n%r\n%r\n%r'% (ser['date'],ser['vect'],ser['data'],par[i]))
-                copulae.append(
-                    cop.CopulaManager(ser['date'], ser['vect'], ser['data'], par[i], var_function=ser['var_function']))
-            self.copulae = copulae
-        else:
-            copulae = self.copulae
-            for i in range(nbSeries):
-                copulae[i].update(par[i])
+        # 2 - creation of the single series copula-managers
 
+        copulae = self.copulae
+        for i in range(nbSeries):
+            copulae[i].update(par[i])
 
-
-                ### 3 - taking only the dates that correspond
+        # 3 - taking only the dates that correspond
 
         date_max = copulae[0].dateM[-1]
         date_min = copulae[0].dateM[0]
 
-        #print('date range: %s %s' % (str(date_min), str(date_max)))
+        # print('date range: %s %s' % (str(date_min), str(date_max)))
 
         dates = []
 
@@ -142,7 +135,7 @@ class CopulaManagerMS:
             date_min = max(date_min, d[0])
             date_max = min(date_max, d[-1])
 
-        current_indexes = [0 for _ in range(nbSeries)]
+        current_indexes = [0] * nbSeries
         date_indexes = [[] for _ in range(nbSeries)]
         dates_element = [next(dates[i]) for i in range(nbSeries)]
         dateM = []
@@ -172,26 +165,23 @@ class CopulaManagerMS:
                 else:
                     cur += timedelta(hours=1)
 
-                    ### 4 - retrieving the values (saved in vectM)
-        series_to_consider = []
-        for i in range(nbSeries):
-            if not just_parameters[i]:
-                series_to_consider.append(i)
+        # 4 - retrieving the values (saved in vectM)
+        series_to_consider = [i for i in range(nbSeries) if not just_parameters[i]]
 
         vectM = []
         for i in series_to_consider:
             for vec in self.copulae[i].vectM:
-                vectM.append(list(map(vec.__getitem__, date_indexes[i])))
+                vectM.append([vec[j] for j in date_indexes[i]])
 
         dataM = []
         for ser in series_to_consider:
             dataM_tp = {}
-            for key in copulae[ser].dataM.keys():
-                dataM_tp[key] = [list(map(copulae[ser].dataM[key][dim].__getitem__, date_indexes[ser])) for dim in
+            for key in copulae[ser].dataM:
+                dataM_tp[key] = [[copulae[ser].dataM[key][dim][i] for i in date_indexes[ser]] for dim in
                                  range(copulae[ser].dim)]
             dataM.append(dataM_tp)
 
-            ### 5 - computing the copula points again
+        # 5 - computing the copula points again
 
         self.dim = len(vectM)
         self.dateM = dateM
@@ -249,7 +239,7 @@ class CopulaManagerMS:
 
         # axis=[[]for i in range(nb_axes)]
         axis = []
-        cosinus = [[] for i in range(nb_axes)]
+        cosinus = [[] for _ in range(nb_axes)]
         norms = []
         corners = []
 
@@ -265,7 +255,7 @@ class CopulaManagerMS:
             temp = math.sqrt(temp)
             if temp == 0:
                 print('null vector: %r' % l)
-                return ([0 for i in l], 0)
+                return ([0 for _ in l], 0)
             return ([i / temp for i in l], temp)
 
         print('creation of axes')
@@ -306,13 +296,13 @@ class CopulaManagerMS:
             neg = list(map(v_neg.__getitem__, ind_neg))
             neg = neg[-endFraction:]
 
-            pt = [0 for i in range(dim)]
+            pt = [0] * dim
             for j in pos:
                 for k in range(dim):
                     pt[k] += j[k]
             corners.append([j / endFraction for j in pt])
 
-            pt = [0 for i in range(dim)]
+            pt = [0] * dim
             for j in neg:
                 for k in range(dim):
                     pt[k] += j[k]
@@ -331,13 +321,13 @@ class CopulaManagerMS:
                 neg = list(map(u_neg.__getitem__, ind_neg))
                 neg = neg[-endFraction:]
 
-                pt = [0 for i in range(dim)]
+                pt = [0] * dim
                 for j in pos:
                     for k in range(dim):
                         pt[k] += j[k]
                 corners_unif.append([j / endFraction for j in pt])
 
-                pt = [0 for i in range(dim)]
+                pt = [0] * dim
                 for j in neg:
                     for k in range(dim):
                         pt[k] += j[k]
@@ -349,7 +339,7 @@ class CopulaManagerMS:
         print('      number of points per quadrants: %d' % cornerFraction)
         print('      number of points considered per quadrants:%d' % endFraction)
 
-        if visualize & (dim == 3):
+        if visualize and (dim == 3):
             print('plotting')
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
@@ -380,7 +370,7 @@ class CopulaManagerMS:
             temp = list(zip(*tuple(corners_unif)))
             ax.scatter(temp[0], temp[1], temp[2], c='red', color='red')
 
-        if visualize & (dim == 2):
+        if visualize and (dim == 2):
             print('plotting')
             plt.figure()
             plt.title('representative points on the real distribution')
@@ -416,15 +406,15 @@ class CopulaManagerMS:
                 incr += 1
                 if incr > 1:
                     break
-        plt.figure()
-        plt.plot(v[0], v[1], '.')
+            plt.figure()
+            plt.plot(v[0], v[1], '.')
 
     def plot(self, proj=[[]], which='unif', date=True):
         if proj == [[]]:
             dim = self.dim
             for i in range(dim - 1):
-                x = [0 for j in range(dim)]
-                y = [0 for j in range(dim)]
+                x = [0 for _ in range(dim)]
+                y = [0 for _ in range(dim)]
                 x[i] = 1
                 y[i + 1] = 1
                 print([x, y])
@@ -478,12 +468,11 @@ class CopulaManagerMS:
 
     def __str__(self):
         maxN = 6
-        print('\n### SCALAR PARAMETERS ### \n \n')
-        print('-> nbSeries= %d \n-> dim= %d' % (self.nbSeries, self.dim))
-        print('\n\n### PARAMETERS AND TERTIARY DATA ###\n')
-        print('copulae (len=%d) ...' % len(self.copulae))
+        # print('\n### SCALAR PARAMETERS ### \n \n')
+        # print('-> nbSeries= %d \n-> dim= %d' % (self.nbSeries, self.dim))
+        # print('\n\n### PARAMETERS AND TERTIARY DATA ###\n')
+        # print('copulae (len=%d) ...' % len(self.copulae))
         string = ''
-        l = {'type', 'location', 'kind'}
         for i in range(self.nbSeries):
             par = self.parameters[i]
             string = '%s\n   -> %s %s in %s' % (string, par['type'], par['kind'], par['location'])

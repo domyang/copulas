@@ -556,7 +556,7 @@ def plot(points, noTranspose=False):
 
 
 ### plots the values of a function on a given interval
-def curve3d(f, inter1=[0, 1], inter2=[0, 1], points=True, nb=25, title=''):
+def curve3d(f, inter1=(0, 1), inter2=(0, 1), points=True, nb=25, title=''):
     xx = [(inter1[1] - inter1[0]) * (i % nb + 0.5) / nb + inter1[0] for i in range(nb ** 2)]
     yy = [(inter2[1] - inter2[0]) * (i // nb + 0.5) / nb + inter2[0] for i in range(nb ** 2)]
     if points:
@@ -1148,7 +1148,7 @@ def tail_projection(vects, copula=True):
     nb_axes = 2 ** (dim - 1)
 
     res = []
-    axis = [-1 for i in range(dim)]
+    axis = [-1] * dim
     axis[-1] = 1
     denom = np.sqrt(2) ** (dim)
 
@@ -1350,8 +1350,8 @@ def find_quantiles(cdf, l, start=0, step=0.1, precision=0.00001):
     res = []
     cur = start
     length = len(l)
-    ind = sorted(range(length), key=l.__getitem__)
-    ordered_quantiles = list(map(l.__getitem__, ind))
+    indices = sorted(range(length), key=l.__getitem__)
+    ordered_quantiles = [l[i] for i in indices]
 
     for i in ordered_quantiles:
         cur_step = step
@@ -1374,8 +1374,8 @@ def find_quantiles(cdf, l, start=0, step=0.1, precision=0.00001):
         if incr >= max_iter:
             print('max number of iteration reached')
 
-    ind_inverse = sorted(range(length), key=ind.__getitem__)
-    result = list(map(res.__getitem__, ind_inverse))
+    ind_inverse = sorted(range(length), key=indices.__getitem__)
+    result = [res[i] for i in ind_inverse]
 
     return result
 
@@ -1434,7 +1434,6 @@ def empirical_CDF_scalar(obs, exp_tails=True, mi=None, ma=None):
         return f
 
     bi, ba = (mi is not None), (ma is not None)
-    length = len(obs)
 
     if bi:
         if mi > min(obs):
@@ -1456,12 +1455,10 @@ def empirical_CDF_scalar(obs, exp_tails=True, mi=None, ma=None):
         g = aux(obs_bis)
 
         def f(x):
-            if bi:
-                if (x < mi):
-                    return 0
-            if ba:
-                if (x > ma):
-                    return 1
+            if bi and x < mi:
+                return 0
+            if ba and x > ma:
+                return 1
 
             # creating linear CDF with two added observations: mi and ma
             res = g(x)
@@ -1634,32 +1631,28 @@ def marginals_cdf(vects, seg_N=10, interpolate='linear'):
 
 
 ### similarily, computes the inverses of the marginals'CDFs
-def marginals_cdf_inv(vects, seg_N=10, limits=None, interpolate='linear', ):  # 'epi-spline'):
+def marginals_cdf_inv(vects, seg_N=10, limits=None, interpolate='linear'):  # 'epi-spline'):
     bins = 100
     res = []
     dim = len(vects)
-    limited = False
-    if limits is not None:
-        if isinstance(limits, tuple):
-            if len(limits) == 2:
-                limited = True
+    limited = isinstance(limits, tuple) and (len(limits) == 2)
 
     if dim == 0:
         print('dimension of array must be >0')
         return None
-    for i in range(dim):
 
+    for i in range(dim):
         if interpolate == 'epi-spline':
             # creating a histogram of the distribution
-            h = np.histogram(vects[i], bins=bins)
+            hist, bin_edges = np.histogram(vects[i], bins=bins)
             xx = []
             for j in range(bins):
-                xx.append(float(h[1][j] + h[1][j + 1]) / 2)
-            yy = [h[0][0]]
+                xx.append(float(bin_edges[j] + bin_edges[j + 1]) / 2)
+            yy = [hist[0]]
 
             div = 0
             for j in range(bins - 1):
-                div = float(yy[j] + h[0][j + 1])
+                div = float(yy[j] + hist[j + 1])
                 yy.append(div)
 
             div -= yy[0]
@@ -1760,10 +1753,8 @@ def copula_to_distribution(vects, visualize=False):
 
     def func(unifs, visu=visualize):
         if len(unifs) != dim:
-            raise (RuntimeError('vects and unifs must have same dimensions'))
-        res = []
-        for i in range(dim):
-            res.append([f_inv[i](x) for x in unifs[i]])
+            raise RuntimeError('vects and unifs must have same dimensions')
+        res = [[f_inv[i](x) for x in unifs[i]] for i in range(dim)]
 
         if visu:
             plt.figure()
@@ -1907,7 +1898,7 @@ def conditional_matrix_gaussian(M):
 
 sun = ephem.Sun()
 california = ephem.Observer()
-california.lat = '37';
+california.lat = '37'
 california.lon = '-122'
 
 
@@ -1938,30 +1929,27 @@ def sun_rise_set(date):
 # l: a dictionary containing the data at keys: 'act' (actuals), 'for' (forecasts) and 'date'
 def prepare_solar(l, visualize=False):
     length = len(l['date'])
-    error = [l['act'][i] - l['for'][i] for i in range(length)]
-    d = l['date'].copy()
-    e = error.copy()
-    f = l['for'].copy()
-    a = l['act'].copy()
+    error = [actual - forecast for actual, forecast in zip(l['act'], l['for'])]
     hour_sol = []
     date = []
 
     # renormalizing the errors by square root of the maximum forecast (proportional to the number of generators...)
     error_temp = []
     actuals = []
-    forecast = []
+    forecasts = []
     f_max = 1
     forecast_max = []
 
     nb_slices = 32
-    obs = []
-    for i in f:
-        f_max = max(f_max, i)
+
+    # Creates a list of maximums of f[0:i] for i in len(f)
+    for forecast in l['for']:
+        f_max = max(f_max, forecast)
         forecast_max.append(f_max)
 
-    for i in range(length - 50):
-        time = dt.parse(d.pop())
-        err = e.pop() / math.sqrt(forecast_max.pop())
+    for i in range(50, length):
+        time = l['date'][i]
+        err = error[i] / math.sqrt(forecast_max[i])
 
         # estimating the solar hour
         rise, sete = sun_rise_set('%d-%d-%d' % (time.year, time.month, time.day))
@@ -1971,59 +1959,43 @@ def prepare_solar(l, visualize=False):
             date.append(str(time))
             hour_sol.append(sol_hour)
             error_temp.append(err)
-            forecast.append(f.pop())
-            actuals.append(a.pop())
+            forecasts.append(l['for'][i])
+            actuals.append(l['act'][i])
 
-        else:
-            f.pop()
-            a.pop()
-
-    hour_sol.reverse()
-    date.reverse()
-    error_temp.reverse()
     obs = error_temp.copy()
-    forecast.reverse()
-    actuals.reverse()
 
     # estimating the mean square error as a function of time
     length1 = len(hour_sol)
     variance = []
     incr = 0
-    nb_obs = int(length1 / nb_slices)
-    x = [0 for i in range(nb_slices + 1)]
-    slices = [[] for i in range(nb_slices + 1)]
-    index = sorted(range(length1), key=hour_sol.__getitem__)
-    obs = map(obs.__getitem__, index)
-    hour_sol_sorted = map(hour_sol.__getitem__, index)
+    nb_obs = length1 // nb_slices
+    x = [0] * (nb_slices + 1)
+    slices = [[] for _ in range(nb_slices + 1)]
+    indices = sorted(range(length1), key=hour_sol.__getitem__)
+    obs = [obs[i] for i in indices]
+    hour_sol_sorted = [hour_sol[i] for i in indices]
 
-    for i in zip(obs, hour_sol_sorted):
-        slices[incr // nb_obs].append(i[0])
-        x[incr // nb_obs] += i[1]
+    for error, solar_hour in zip(obs, hour_sol_sorted):
+        slices[incr // nb_obs].append(error)
+        x[incr // nb_obs] += solar_hour
         incr += 1
 
-    incr = 0
-    for i in slices[0:nb_slices]:
-        len_temp = len(i)
-        sd = math.sqrt(np.var(i))
+    for i, slice in enumerate(slices[:nb_slices]):
+        len_temp = len(slice)
+        sd = math.sqrt(np.var(slice))
         variance.append(sd)
-        if (incr == 0) | (incr == nb_slices - 1):
+        if (i == 0) or (i == nb_slices - 1):
             variance.append(sd)
-        x[incr] /= len_temp
-        incr += 1
-    x = x[:-1]
-
-    x.append(12)
-    temp = [0]
-    temp.extend(x)
-    x = temp
+        x[i] /= len_temp
+    x = [0] + x[:-1] + [12]
 
     # creating the spline estimator of the mean square error
     inter = create_spline(find_spline(x, variance, visualize=False, seg_N=nb_slices // 2))
 
     # normalizing the error
     normed_error = []
-    for i in zip(hour_sol, error_temp):
-        normed_error.append(i[1] / inter(i[0]))
+    for solar_hour, error in zip(hour_sol, error_temp):
+        normed_error.append(error / inter(solar_hour))
 
     if visualize:
         plt.figure()
@@ -2036,17 +2008,17 @@ def prepare_solar(l, visualize=False):
         plt.plot(hour_sol, normed_error, '.')
         plt.draw()
 
-    return {'date': date, 'hour_sol': hour_sol, 'error': normed_error, 'for': forecast, 'act': actuals,
+    return {'date': date, 'hour_sol': hour_sol, 'error': normed_error, 'for': forecasts, 'act': actuals,
             'var_function': inter}
 
 
 def intersect_dates(intervals, current, width, visualize=False):
-    if type(current) == str:
+    if isinstance(current, str):
         current = dt.parse(current)
     if np.ndim(intervals[0]) == 0:
         intervals = [intervals]
-    if type(intervals[0][0]) == str:
-        intervals = [(dt.parse(i[0]), dt.parse(i[1])) for i in intervals]
+    if isinstance(intervals[0][0], str):
+        intervals = [(dt.parse(a), dt.parse(b)) for (a, b) in intervals]
 
     incr = 2
     if visualize:
@@ -2054,9 +2026,9 @@ def intersect_dates(intervals, current, width, visualize=False):
         plt.plot([incr, incr + 0.03, incr + .03, incr], [0, 0, 0.03, 0.03])
 
     res = []
-    for i in intervals:
-        mi = (i[0] - current).days
-        ma = (i[1] - current).days
+    for start, end in intervals:
+        mi = (start - current).days
+        ma = (end - current).days
         print(mi, ma)
 
         if visualize:
@@ -2064,7 +2036,7 @@ def intersect_dates(intervals, current, width, visualize=False):
 
         if 0 <= (mi + width) % 365.25 <= 2 * width:
             temp = int(((mi + width) // 365.25) * 365.25 + width)
-            res.append((str(i[0]), str(current + relativedelta(days=min(temp, ma)))))
+            res.append((str(start), str(current + relativedelta(days=min(temp, ma)))))
 
             if visualize:
                 print('1: %r' % [mi, min(temp, ma)])
@@ -2074,7 +2046,7 @@ def intersect_dates(intervals, current, width, visualize=False):
         if 0 <= (ma + width) % 365.25 <= 2 * width:
             temp = int(((ma + width) // 365.25) * 365.25 - width)
             if temp > mi:
-                res.append((str(current + relativedelta(days=temp)), str(i[1])))
+                res.append((str(current + relativedelta(days=temp)), str(end)))
                 if visualize:
                     print('2: %r' % [temp, ma])
                     plt.plot([temp, ma], [incr, incr], c='red')
