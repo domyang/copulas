@@ -17,12 +17,17 @@ simple_copulas.sort()
 copula_constructors = [cop2d_clayton, cop2d_frank, cop2d_gaussian, cop2d_gumbel, cop2d_student]
 
 class Event:
-    def __init__(self, names, date, logs, quantile, emd):
+    """
+    This is an object which contains all the pertinent details stored after each cycle of the test.
+    It stores the log-likelihood, quantile,
+    """
+    def __init__(self, names, date, logs, quantile, emd, rank):
         self.names = names
         self.date = date
         self.logs = logs
         self.quantile = quantile
         self.emd = emd
+        self.rank = rank
 
     def log_by_name(self, name):
         name_index = self.names.index(name)
@@ -44,12 +49,13 @@ class Results:
         self.ranks = results_dict['rank']
         self.log = results_dict['log']
         self.names = results_dict['names']
-        self.dates = results_dict['date']
+        self.dates = results_dict['dates']
         self.parameters = results_dict['parameters']
-        self.events = [Event(self.names, date, logs, quantile, emd) for date, logs, quantile, emd in zip(self.dates,
+        self.events = [Event(self.names, date, logs, quantile, emd, rank) for date, logs, quantile, emd, rank in zip(self.dates,
                                                                                                          self.log,
                                                                                                          self.proj_quantile,
-                                                                                                         self.proj_emd)]
+                                                                                                         self.proj_emd,
+                                                                                                         self.ranks)]
         for key in results_dict:
             setattr(self, key, results_dict[key])
 
@@ -66,8 +72,8 @@ class Results:
         self.emd_fit_all = np.mean(np.mean(np.mean(self.proj_emd, 0), 1), 1)
         self.emd_fit_main = [i[-1] for i in np.mean(np.mean(self.proj_emd, 0), 2)]
         self.emd_all = np.mean(np.mean(self.emd_vec, 0), 1)
-        self.emd_low = [i[0] for i in self.emd_vec[-1]]
-        self.emd_up = [i[1] for i in self.emd_vec[-1]]
+        self.emd_low = [low for (low, _) in self.emd_vec[-1]]
+        self.emd_up = [up for (_, up) in self.emd_vec[-1]]
 
         self.attrs = ['log-likelihood', 'EMD fit all', 'EMD fit main', 'EMD all', 'EMD low', 'EMD up']
 
@@ -76,8 +82,6 @@ class Results:
         Returns a dictionary of all the ranks of the experiment by name of distribution, usually use
         for the main simple distributions as the other distributions are more complicated.
         Returns dict {'log-likelihood':, 'EMD Fit all': , 'EMD Fit Main': , 'EMD UP': , 'EMD low': 'EMD all'
-        :param name:
-        :return:
         """
         name_index = self.names[1:-1].index(name)
         return {'log-likelihood': self.nb_models - stats.rankdata(self.mean_log_likelihood[1:-1])[name_index],
@@ -89,6 +93,11 @@ class Results:
                 'EMD up': stats.rankdata(self.emd_up)[name_index]}
 
     def stats_by_name(self, name):
+        """
+        Returns a dictionary of all the stats of the experiment by name of distribution, usually use
+        for the main simple distributions as the other distribution names are more complicated.
+        Returns dict {'log-likelihood':, 'EMD Fit all': , 'EMD Fit Main': , 'EMD UP': , 'EMD low': 'EMD all'
+        """
         name_index = self.names[1:-1].index(name)
         return {'log-likelihood': self.mean_log_likelihood[1:-1][name_index],
                 'EMD fit all': self.emd_fit_all[name_index],
@@ -98,6 +107,10 @@ class Results:
                 'EMD up': self.emd_up[name_index]}
 
     def get_event(self, date):
+        """
+        This method accepts a date as either a string or a datetime object and returns the corresponding
+        Event with the details for that day
+        """
         if isinstance(date, str):
             date = dt.parse(date)
 
@@ -116,6 +129,10 @@ class Results:
 
 
     def plot_day(self, date, simple=False):
+        """
+        Creates a scatterplot for the points in the window used to construct the copulas for any given date.
+        If simple is True, it also gives 3D plots of the simple copulas
+        """
         if self.manager is None:
             raise RuntimeError("Results object must have associated Copula Manager to retrieve data")
 
@@ -186,6 +203,16 @@ class Results:
         return ut.table_latex(rows, xlabels=names, ylabels=self.attrs, title=title)
 
     def winner_table(self, attr, simple=False, upto=10):
+        """
+        Returns a Latex Table as a string ranking each of the copulas by one of the statistics.
+        Possible values for attr are:
+        - 'EMD fit all'
+        - 'EMD fit main'
+        - 'EMD all'
+        - 'EMD low'
+        - 'EMD up'
+        - 'log-likelihood'
+        """
         rows = []
         reverse = False
         if attr == 'log-likelihood':
@@ -215,10 +242,26 @@ class Results:
                     ylabels.append(int(self.ranks_by_name(name)[attr]))
         return ut.table_latex(rows, ylabels=ylabels, xlabels=["Model", attr])
 
+    def write_csv(self, filename):
+        """Writes the main statistics to a specified csv file"""
+        with open(filename, 'w') as f:
+            writer = csv.writer(f, lineterminator='\n')
+            rows = []
+            for param in sorted(self.parameters):
+                rows.append([param, self.parameters[param]])
+            rows.append(['Copula', 'Mean Log-likelihood', 'EMD fit all', 'EMD fit main', 'EMD all',
+                             'EMD low', 'EMD up'])
+            for name, log, fit_all, fit_main, all, low, up, in zip(self.names[1:-1], self.mean_log_likelihood[1:-1],
+                                                                   self.emd_fit_all, self.emd_fit_main, self.emd_all,
+                                                                   self.emd_low, self.emd_up):
+                rows.append(map(str, [name, log, fit_all, fit_main, all, low, up]))
+
+            writer.writerows(rows)
+
     def __iter__(self):
         return iter(self.events)
 
-def compile_results(results_dict, dir_name=None):
+def compile_results(results_dict, dir_name=None, manager=None):
     if dir_name is None:  # Only used if the parameters key exists
         params = results_dict['parameters']
         dir_name = "{}_{}_{}_win_days_{}_win_forecast_{}".format(params['type'], params['location'], params['kind'],
@@ -243,22 +286,13 @@ def compile_results(results_dict, dir_name=None):
     fig.tight_layout()
     plt.savefig(dir_name + os.sep + 'Average_log_likelihoods.png')
 
-    fig2, ax2 = plt.subplots()
-    m = min(means)
-    adjusted_pairs = [(x, y - m) for (x, y) in pairs]
-    ax2.bar(indices, [pair[1] for pair in adjusted_pairs])
-    ax2.set_ylabel('Average Log Likelihood Minus Least')
-    ax2.set_title('Average Log Likelihood of Various Copulas Over a Series of Observations')
-    ax2.set_xticks(indices + 0.4)
-    ax2.set_xticklabels([pair[0] for pair in pairs], rotation=45)
-    fig2.tight_layout()
-    plt.savefig(dir_name + os.sep + 'Adjusted_log_likelihoods.png')
+    res = Results(results_dict, manager=manager)
 
-    write_csv(results_dict, dir_name + os.sep + 'data.csv')
+    res.write_csv(dir_name + os.sep + 'log_likelihoods_and_emds.csv')
 
-
+"""
 def write_csv(results_dict, filename):
-    """Writes the results of the copula analysis experiment to a csv file"""
+    Writes the results of the copula analysis experiment to a csv file
     with open(filename, 'w', newline='') as f:
         writer = csv.writer(f)
         if results_dict.get('parameters', None):
@@ -285,15 +319,7 @@ def write_csv(results_dict, filename):
                              [results_dict['proj_quantile'][i][j][1]] for j in range(len(results_dict['names'])-2)], [])
             rows.append(row)
         writer.writerows(rows)
-
 """
-def merge_results(*results):
-    new_results = {'log':[], 'proj_emd':[], 'proj_quantile':[], 'names':[]}
-    for result in results:
-        for i, log in enumerate(result['log']):
-            new_results[]
-"""
-
 
 def log_table(list_of_results):
     table = 'Trial #: '
@@ -340,38 +366,8 @@ def join_results(list_of_results):
 
     return new_results
 
-
-def get_emds(res):
-    emds = res['proj_emd']
-    new_emds = [[] for _ in emds[0]]
-    for i, copula in enumerate(emds[0]):
-        new_emds[i].append([emds[j][i][0][0] for j in range(len(emds))])
-        new_emds[i].append([emds[j][i][0][1] for j in range(len(emds))])
-        new_emds[i].append([emds[j][i][1][0] for j in range(len(emds))])
-        new_emds[i].append([emds[j][i][1][1] for j in range(len(emds))])
-    return new_emds
-
-
-def z_interval(data, variance, confidence=.95):
-    xbar = np.mean(data)
-    moe = stats.norm.ppf((1+confidence)/2) * np.sqrt(variance/len(data))
-    return xbar - moe, xbar + moe
-
-
-def t_interval(data, confidence=.95):
-    xbar = np.mean(data)
-    var = np.var(data)
-    N = len(data)
-    moe = stats.t.ppf((1+confidence)/2, N - 1) * np.sqrt(var/N)
-    return xbar - moe, xbar + moe
-
-
-def fix_name(name):
-    if name.startswith('weighted_ST'):
-        return name.replace('ST', 'UN', 1)
-
-
 def mean_difference(data):
+    """Returns the mean of the difference between consecutive values in a list"""
     return np.mean([x - y for (x,y) in zip(data, data[1:])])
 
 

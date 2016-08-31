@@ -29,9 +29,6 @@ class CopulaManager:
                   'date_range': ('', ''), 'first_hour': (-11, 12), 'forecast': [], 'forecast_d': [],
                   'type': 'Wind', 'location': 'total', 'kind': 'error'}
 
-    # dictionary saying which parameters to take into account
-    param_actual = {'window': False, 'date_range': False, 'first_hour': False, 'forecast': False, 'forecast_d': False}
-
     # dictionary stating the need for specific data for given parameters
     data_need = {'date_range': [], 'first_hour': [], 'forecast': ['forecast'], 'forecast_d': ['forecast_d']}
 
@@ -119,9 +116,9 @@ class CopulaManager:
 
         self.update(parameters)
 
-        #print('copula initialized')
+        # print('copula initialized')
 
-    ### the update functions update the window to match the parameters arguments
+    # the update functions update the window to match the parameters arguments
     # returns nothing
     # arguments:
     #   () parameters: a dictionary specifying the window
@@ -143,9 +140,10 @@ class CopulaManager:
 
         for key in self.data:
             dataM[key] = [[] for _ in range(dim)]
-        max_offset = max(parameters['offsets'])
+        offsets = parameters['offsets']
+        max_offset = max(offsets)
 
-        #print('selecting the desired points')
+        # print('selecting the desired points')
         # selecting the desired points
 
         for i, date in enumerate(self.date):
@@ -153,16 +151,10 @@ class CopulaManager:
             if i + max_offset >= self.length:
                 break
 
-            point = [] # The values of vectM
-            more_data = {} # Dictionary of forecast and forecast_d
+            point = [self.vect[i + offset] for offset in offsets]  # The values of vectM
+            # Dictionary of forecast and forecast_d
+            more_data = {key: [data[key][i + offset] for offset in offsets] for key in self.data}
 
-            for offset in parameters['offsets']:
-                point.append(self.vect[i + offset])
-
-            for key in self.data:
-                more_data[key] = []
-                for offset in parameters['offsets']:
-                    more_data[key].append(data[key][i + offset])
 
             if self.parameters['window'](point, date, more_data):
 
@@ -196,7 +188,7 @@ class CopulaManager:
                 var_sol_temp = []
                 rise, sete = ut.sun_rise_set('%d-%d-%d' % (time.year, time.month, time.day))
 
-                for offset in parameters['offsets']:
+                for offset in offsets:
                     var_sol_temp.append(self.var_function(
                         ((offset + time.hour + time.minute / 60 + time.second / 3600) - rise) / (sete - rise) * 12))
 
@@ -205,7 +197,7 @@ class CopulaManager:
 
         self.vectM = vectM
         # creating the copula variables
-        #print('creating the copula points')
+        # print('creating the copula points')
         indexes = set(indexes)
 
         self.indexes = indexes
@@ -244,7 +236,7 @@ class CopulaManager:
         if 'first_hour' in self.parameters:
             first_hour = self.parameters['first_hour']
             string += '      first_hour: (' + str(first_hour[0]) + ', ' + str(first_hour[1]) + ') \n'
-        if 'forecast' in self.parameters.keys():
+        if 'forecast' in self.parameters:
             forecast = self.parameters['forecast']
             if forecast != []:
                 string += '      forecast (len=%d): [' % len(forecast)
@@ -254,7 +246,7 @@ class CopulaManager:
                     else:
                         string += '--ERROR--, '
                 string = string[:-2] + ']\n'
-        if 'forecast_d' in self.parameters.keys():
+        if 'forecast_d' in self.parameters:
             temp = self.parameters['forecast_d']
             if temp != []:
                 string += '      forecast_d (len=%d): [' % len(temp)
@@ -269,8 +261,6 @@ class CopulaManager:
             string += '      type: %s \n      location: %s\n      kind: %s\n\n' % (
             self.parameters['type'], self.parameters['location'], self.parameters['kind'])
         print(string)
-        print('param_actual')
-        print('      %r' % self.param_actual)
 
         print('\n \n### SECONDARY DATA ###\n\n')
         print("-> dateM (len=%d) ['%s', '%s', '%s', ...]\n" % (
@@ -316,86 +306,80 @@ class CopulaManager:
             print(self.vect[:100])
             plt.plot(self.vectM[0], self.vectM[1], '.')
 
-    ### this function checks that the parameters have the correct types, length, values... before initialization or update.
+    # this function checks that the parameters have the correct types, length, values...before initialization or update.
     def check_parameters(self, parameters, data):
-        self.parameters, self.param_actual, self.dim = check_param(parameters, data)
+        self.parameters, self.dim = check_param(parameters, data)
         return None
 
-    ### This function creates a 'window' function that tells whether a data point should be considered.
-    ### This 'window' is then stored in parameters
+    # This function creates a 'window' function that tells whether a data point should be considered.
+    # This 'window' is then stored in parameters
     def define_window(self):
 
-        if not self.param_actual['window']:
+        if 'window' not in self.parameters:
             dim = self.dim
             parameters = self.parameters
-            param_actual = self.param_actual
             date_range = None
-            if param_actual['date_range']:
+            if 'date_range' in self.parameters:
                 date_range = parameters['date_range']
 
-            def f(l, date, data={}):
-                b = True
-                if len(l) == dim:
-                    if any(i is None for i in l):
-                        return False
-                    if param_actual['date_range']:
-                        good_date = False
-                        for start_time, end_time in date_range:
-                            good_date |= (start_time <= date <= end_time)
-                            if good_date:
-                                break
-                        b &= good_date
-
-                    if param_actual['first_hour']:
-                        hour = date.hour
-                        start_hour, end_hour = parameters['first_hour']
-                        b &= (hour - start_hour) % 24 <= (end_hour - start_hour)
-                        # b&=(date-3600*(temp[0]-16))%86400<=(temp[1]-temp[0])*3600
-
-                    if param_actual['forecast']:
-                        for i in range(dim):
-                            b &= parameters['forecast'][i][0] <= data['forecast'][i] <= parameters['forecast'][i][1]
-
-                    if param_actual['forecast_d']:
-                        for i in range(dim):
-                            b &= parameters['forecast_d'][i][0] <= data['forecast_d'][i] <= \
-                                 parameters['forecast_d'][i][1]
-                else:
+            def window(l, date, data=None):
+                if data is None:
+                    data = {}
+                if len(l) != dim:
                     raise RuntimeError('l should be of length %d' % dim)
-                return b
 
-            self.parameters['window'] = f
-            self.param_actual['window'] = True
+                if any(i is None for i in l):
+                    return False
 
-### this function checks that the parameters have the correct types, length, values... before initialization or update.
+                if 'date_range' in self.parameters:
+                    if not any((start_time <= date <= end_time) for start_time, end_time in date_range):
+                        return False
+
+                if 'first_hour' in self.parameters:
+                    hour = date.hour
+                    start_hour, end_hour = parameters['first_hour']
+                    if not ((hour - start_hour) % 24 <= (end_hour - start_hour)):
+                        return False
+                    # b&=(date-3600*(temp[0]-16))%86400<=(temp[1]-temp[0])*3600
+
+                if 'forecast' in self.parameters:
+                    for i in range(dim):
+                        lower_bound, upper_bound = parameters['forecast'][i]
+                        if not (lower_bound <= data['forecast'][i] <= upper_bound):
+                            return False
+
+                if 'forecast_d' in self.parameters:
+                    for i in range(dim):
+                        lower_bound, upper_bound = parameters['forecast_d'][i]
+                        if not(lower_bound <= data['forecast_d'][i] <= upper_bound):
+                            return False
+                return True
+
+            self.parameters['window'] = window
+# this function checks that the parameters have the correct types, length, values... before initialization or update.
+
+
 def check_param(parameters, data):
     # checking mandatory element (offset)
 
     param_temp = {}
-    param_actual = {'window': False, 'date_range': False, 'first_hour': False, 'kind': False, 'forecast': False,
-                    'forecast_d': False}
-    dim = 0
 
-    #print('############ checking parameters ##############')
+    # print('############ checking parameters ##############')
     if 'offsets' in parameters:
         offsets_fine = all([isinstance(offset, int) for offset in parameters['offsets']])
         dim = len(parameters['offsets'])
-        offsets_fine &= dim > 0
         param_temp['offsets'] = sorted(parameters['offsets'])
-        if not offsets_fine:
+        if not (offsets_fine and dim > 0):
             raise (RuntimeError('"parameters[\'offsets\']" should be of type \'list of int\' '
                                 'and length superior than 0'))
     else:
-        raise (RuntimeError('\'offsets\' key in parameters not found '))
+        raise RuntimeError("'offsets' key in parameters not found ")
 
     # checking window arguments
-
-    # What does this do???
     if 'window' in parameters:
-        temp = parameters['window']
+        window = parameters['window']
         try:
-            if type(temp([0.5 for _ in dim], dt.parse('01/01/2000 01:10'))) == bool:
-                param_actual['window'] = True
+            if isinstance(window([0.5 for _ in dim], dt.parse('01/01/2000 01:10')), bool):
                 param_temp['window'] = parameters['window']
         except TypeError:
             pass
@@ -403,88 +387,74 @@ def check_param(parameters, data):
     if 'date_range' in parameters:
         date_range = parameters['date_range']
         try:
-            if type(date_range) in {list, tuple}:
-                if len(date_range) == 2:
-                    if type(date_range[0]) == type(date_range[1]) == str:
-                        param_actual['date_range'] = True
-                        param_temp['date_range'] = [[dt.parse(date) for date in parameters['date_range']]]
-            if type(date_range) in {list, tuple, set}:
-                b = True
-                for date in date_range:
-                    if not type(date) in {tuple, list}:
-                        b = False
-                    correct = False
-                    if len(date) == 2:
-                        if type(date[0]) == type(date[1]) == str:
-                            correct = True
-                    b &= correct
-                    if b == False:
-                        break
-                if b:
-                    param_actual['date_range'] = True
-                    param_temp['date_range'] = [[dt.parse(date) for date in dates] for dates in parameters['date_range']]
+            if (isinstance(date_range, (list, tuple)) and len(date_range) == 2
+                 and isinstance(date_range[0], str) and isinstance(date_range[1], str)):
+                param_temp['date_range'] = [[dt.parse(date) for date in parameters['date_range']]]
 
-            if not param_actual['date_range']:
+            if isinstance(date_range, (list, tuple, set)):
+                for date in date_range:
+                    if not isinstance(date, (tuple, list)):
+                        break
+                    if not (len(date) == 2 and isinstance(date[0], str) and isinstance(date[1], str)):
+                        break
+                else:
+                    param_temp['date_range'] = [[dt.parse(start), dt.parse(end)] for start, end in parameters['date_range']]
+            else:
                 print('Warning: "parameters[\'date_range\']" should be of type (str,str)')
         except ValueError:
             print('Warning: "parameters[\'date_range\']" should be of type (str,str)')
 
     if 'first_hour' in parameters:
         first_hour = parameters['first_hour']
-        if isinstance(first_hour, tuple):
-            if len(first_hour) == 2:
-                if isinstance(first_hour[0], int) and isinstance(first_hour[1], int):
-                    if -11 <= first_hour[0] <= first_hour[1] <= 12:
-                        param_actual['first_hour'] = True
-                        param_temp['first_hour'] = parameters['first_hour']
-        if not param_actual['first_hour']:
+        if (isinstance(first_hour, tuple)
+            and len(first_hour) == 2
+            and isinstance(first_hour[0], int) and isinstance(first_hour[1], int)
+            and -11 <= first_hour[0] <= first_hour[1] <= 12):
+
+            param_temp['first_hour'] = parameters['first_hour']
+        else:
             print('Warning: "parameters[\'first_hour\']" should be of type (int1,int2) with -11<=int1<=int2<=12')
 
     if 'forecast' in parameters:
         print('\n for: %r \n' % parameters['forecast'])
 
-        b = isinstance((parameters['forecast']), list)
-        if b:
+        if isinstance((parameters['forecast']), list):
             for forecast in parameters['forecast']:
-                b_bis = False
-                if isinstance(forecast, tuple):
-                    if len(forecast) == 2:
-                        if isinstance(forecast[0], (float, int)) and isinstance(forecast[1], (float, int)):
-                            b_bis = True
-                b &= b_bis
-        param_actual['forecast'] = b
-        if b:
-            param_temp['forecast'] = parameters['forecast']
-        else:
+                if not(isinstance(forecast, tuple)
+                       and len(forecast) == 2
+                       and isinstance(forecast[0], (float, int))
+                       and isinstance(forecast[1], (float, int))):
+                    break
+            else:
+                param_temp['forecast'] = parameters['forecast']
+
+        if 'forecast' not in param_temp:
             print('Warning: "parameters[\'forecast\']" should be of type (float,float)')
             print('parameters[\'forecast\']: %r' % parameters['forecast'])
-        if param_actual['forecast'] and ('forecast' not in data):
-            param_actual['forecast'] = False
+        if 'forecast' in param_temp and ('forecast' not in data):
+            del param_temp['forecast']
             print('Warning: you need to give the forecast in the data to use it as a window parameter')
 
     if 'forecast_d' in parameters:
-        b = type(parameters['forecast_d']) == list
-        if b:
+        if isinstance(parameters['forecast_d'], list):
             for forecast_d in parameters['forecast_d']:
-                b_bis = False
-                if isinstance(forecast_d, tuple):
-                    if len(forecast_d) == 2:
-                        if isinstance(forecast_d[0], (float, int)) and isinstance(forecast_d[1], (float, int)):
-                            b_bis = True
-                b &= b_bis
-        param_actual['forecast_d'] = b
-        if b:
-            param_temp['forecast_d'] = parameters['forecast_d']
-        else:
+                if not(isinstance(forecast_d, tuple)
+                       and len(forecast_d) == 2
+                       and isinstance(forecast_d[0], (float, int))
+                       and isinstance(forecast_d[1], (float, int))):
+                    break
+            else:
+                param_temp['forecast_d'] = parameters['forecast_d']
+
+        if 'forecast_d' not in param_temp:
             print('Warning: "parameters[\'forecast_d\']" should be of type (float,float)')
-        if param_actual['forecast_d'] and ('forecast_d' not in data):
-            param_actual['forecast_d'] = False
+        if ('forecast_d' in param_temp) and ('forecast_d' not in data):
+            del param_temp['forecast_d']
             print('Warning: you need to give the forecast derivative in the data to use it as a window parameter')
 
     if 'predicted_day' in parameters:
         if isinstance(parameters['predicted_day'], datetime):
             param_temp['predicted_day'] = parameters['predicted_day']
-            param_actual['predicted_day'] = True
 
     # checking informative arguments
 
@@ -507,4 +477,4 @@ def check_param(parameters, data):
         else:
             print('Warning: "parameters[\'kind\']" should be of type string')
 
-    return (param_temp, param_actual, dim)
+    return param_temp, dim

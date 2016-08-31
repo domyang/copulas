@@ -4,6 +4,7 @@ import sys
 import time
 from datetime import timedelta
 from copy import deepcopy
+import os
 
 import copulaMS as cms
 import copulaModels as mod
@@ -15,8 +16,7 @@ import utilities as ut
 import vines
 from dateutil.relativedelta import relativedelta
 
-home_dir = 'C:\\users\\sabrina\\documents\\research\\code for real user\\'
-
+home_dir='c:\\users\\sabrina\\documents\\research\\code for real user\\'
 
 ### this function fetches the data to create a MS (multi series) copula manager.
 ### for solar data, it additionally takes into account the solar hour factor
@@ -24,7 +24,8 @@ home_dir = 'C:\\users\\sabrina\\documents\\research\\code for real user\\'
 # returns a MS copula manager
 # arguments:
 #   () titles: {}
-def create_copulaManager(titles, parameters_def, list_parameters=None, just_parameters=None):
+def create_copulaManager(titles, parameters_def, list_parameters=None,
+                         just_parameters=None, filename=None, sourcefile=None):
     length = len(titles)
     series = []
 
@@ -54,7 +55,7 @@ def create_copulaManager(titles, parameters_def, list_parameters=None, just_para
             series.append(serie)
         else:
             serie = {}
-            res = get_data(type=title['type'], location=title['location'])
+            res = get_data(type=title['type'], location=title['location'], filename=filename, sourcefile=sourcefile)
             if title['type'] == 'Solar':
                 # call to take into account the importance of solar hour in solar power forecast errors
                 res2 = ut.prepare_solar(res, visualize=False)
@@ -99,10 +100,7 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
     # keeping the old window parameters in param_fixed
     param_fixed = []
     for par in copula.parameters:
-        dic = {}
-        dic['date_range'] = par['date_range']
-        dic['offsets'] = par['offsets']
-        dic['first_hour'] = par['first_hour']
+        dic = {'date_range': par['date_range'], 'offsets': par['offsets'], 'first_hour': par['first_hour']}
         param_fixed.append(dic)
 
     # initializing variables
@@ -255,8 +253,8 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
         res['rank'].append(rank)
         res['dates'].append(date)
 
-            #res['problem'].append('incr %d general problem: %r' % (incr, sys.exc_info()[0]))
-            #print(incr, sys.exc_info()[0], file=sys.stderr)
+        # res['problem'].append('incr %d general problem: %r' % (incr, sys.exc_info()[0]))
+        # print(incr, sys.exc_info()[0], file=sys.stderr)
 
     copula.update(param_fixed[0], list_parameters=param_fixed)
     return res
@@ -398,7 +396,7 @@ def select_observations(copula, date, repeat_win_days=False, win_days=90, win_fo
         return indexes_tp
 
     indexes = get_indexes()
-    vects = [list(map(copula.vectM[i].__getitem__, indexes)) for i in range(copula.dim)]
+    vects = [[vect[j] for j in indexes] for vect in copula.vectM]
     unifs = ut.uniforms(vects, rand=False)
     copula.update(original_parameters[0])
     return vects, unifs
@@ -547,9 +545,14 @@ def copula_evolution(copula, win_days=45, day_interval=60, nb_max=5, method='col
 # returns a dictionary, 'data' with keys:   - 'act' (actuals)
 #                                           - 'for' (forecasts)
 #                                           - 'date'
-def get_data(type='Wind', location='total', filename=''):
-    if filename == '':
-        csv_read = csv.reader(open(home_dir + 'tests/data/sources.csv'))
+# If you have a file which dictates which files to draw from, you can specify with the sourcefile parameter
+# When doing this, you also must specify the type and location of the data
+def get_data(filename=None, type='Wind', location='total', sourcefile=None):
+    if filename is None:
+        if sourcefile is None:
+            sourcefile = home_dir + 'tests/data/sources.csv'
+
+        csv_read = csv.reader(open(sourcefile))
         index = -1
         index_dir = -1
         break1 = False
@@ -568,7 +571,7 @@ def get_data(type='Wind', location='total', filename=''):
             print('data specification is not valid 1')
             return -1
         else:
-            csv_read = csv.reader(open(home_dir + 'tests/data/sources.csv'))
+            csv_read = csv.reader(open(sourcefile))
             for line in csv_read:
                 if (len(line) < 1) or (line[1] == '#'):
                     continue
@@ -631,10 +634,7 @@ def test_models_old(copula, win_days=45, repeat_win_days=False, win_forecast=0.2
     # keeping the old window parameters in param_fixed
     param_fixed = []
     for par in copula.parameters:
-        dic = {}
-        dic['date_range'] = par['date_range']
-        dic['offsets'] = par['offsets'].copy()
-        dic['first_hour'] = par['first_hour']
+        dic = {'date_range': par['date_range'], 'offsets': par['offsets'].copy(), 'first_hour': par['first_hour']}
         param_fixed.append(dic)
 
     # initializing variables: parameters, dim (dimension of the copula), forecast, errors, dates,

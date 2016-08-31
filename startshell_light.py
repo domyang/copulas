@@ -20,5 +20,5 @@ combs3b = [lambda unifs, comb=comb: vines.WeightedCopula(unifs, comb, precise=Fa
 #          lambda unifs: vines.D_vine(unifs, list_models=[list_models + combs2, list_models]),
 #          lambda unifs: vines.D_vine(unifs, list_models=[list_models + combs2 + combs3, list_models])]
 models = list_models + combs2 + combs2b + combs3 + combs3b
-res = ca.test_models(copula, list_models=models)
+res = ca.test_models(copula, list_models=models, start_incr=400, end_incr=401)
 results.compile_results(res, 'C:\\users\\sabrina\\desktop\\horse_races\\trials2')
