@@ -1,5 +1,6 @@
 import numpy as np
-
+import vines
+import copula_analysis as ca
 
 def pos_semidef(dim):
     matrix = np.zeros((dim, dim))
@@ -40,6 +41,35 @@ def gaussian_sample(size=1000, mean=None, cov=None, dim=2):
     return np.random.multivariate_normal(mean, cov, size)
 
 if __name__ == '__main__':
-    U = uniform_sample()
-    S = student_sample()
-    G = gaussian_sample()
+    gu = vines.cop2d_gumbel
+    ga = vines.cop2d_gaussian2
+    st = vines.cop2d_student
+    fr = vines.cop2d_frank
+    un = vines.cop2d_uniform
+    cl = vines.cop2d_clayton
+
+    list1 = [gu, ga, st, fr, un, cl]
+
+    s_samples = []
+    g_samples = []
+    u_samples = []
+    for _ in range(10):
+        s_samples.append(student_sample(20000).T.tolist())
+        u_samples.append(uniform_sample(20000).T.tolist())
+        g_samples.append(gaussian_sample(20000).T.tolist())
+
+    g_results = []
+    s_results = []
+    u_results = []
+
+    for sample in s_samples:
+        copula = ca.fake_copulaManager(sample)
+        s_results.append(ca.test_models(copula, list_models=list1))
+
+    for sample in u_samples:
+        copula = ca.fake_copulaManager(sample)
+        u_results.append(ca.test_models(copula, list_models=list1))
+
+    for sample in g_samples:
+        copula = ca.fake_copulaManager(sample)
+        g_results.append(ca.test_models(copula, list_models=list1))

@@ -5,10 +5,10 @@ from scipy.interpolate import UnivariateSpline
 import matplotlib.pyplot as plt
 import sys
 
-home_dir='/home/ambroiseidoine/UCD/'
+home_dir='C:\\users\\sabrina\\documents\\research\\code for real user\\'
 
-sys.path.append(home_dir+'code/prescient/release/Prescient_1.0/')
-sys.path.append(home_dir+'code/prescient/release/Prescient_1.0/exec')
+sys.path.append(home_dir+'prescient/release/Prescient_1.0/')
+sys.path.append(home_dir+'prescient/release/Prescient_1.0/exec')
 import ScenGen.workflow.EpiModel as EpiModel
 import exec.MasterOptions as MasterOptions
 

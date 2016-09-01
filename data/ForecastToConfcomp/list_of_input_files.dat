@@ -1,0 +1,15 @@
+# list of files to be processed by ForecastToConfComp.py
+fc 201312-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201311-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201310-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201309-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201308-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201307-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201306-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201305-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201304-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201303-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201302-02-AVG-BPA-Wind-Power-Forecast.csv
+fc 201301-02-AVG-BPA-Wind-Power-Forecast.csv
+br ReservesDeployedYTD_2013_1.csv
+br ReservesDeployedYTD_2013_2.csv

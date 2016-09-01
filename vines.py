@@ -158,7 +158,7 @@ class C_vine(conditional):
         if arg_unif is None:
             arg_unif = self.uniforms
 
-        not_list = np.ndim(arg_unif[0])==0
+        not_list = np.ndim(arg_unif[0]) == 0
         if not_list:
             arg_unif = [[i] for i in arg_unif]
 
@@ -191,7 +191,7 @@ class C_vine(conditional):
 
     # returns the density
     def pdf(self, unifs):
-        not_list = np.ndim(unifs[0])==0
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
@@ -211,7 +211,7 @@ class C_vine(conditional):
 
         def pdf(x):
 
-            not_list = np.ndim(x)==0
+            not_list = np.ndim(x) == 0
             if not_list:
                 x = [x]
 
@@ -251,7 +251,8 @@ class C_vine(conditional):
                     res_tp = self.copulae[j][i - j - 1].conditionalCDF([res_tp, [temp[j][pt]]], coor=1)
                 return res_tp[0]
 
-            res_tp = [optimize.brentq(lambda x: cdf(x, pt) - unifs[i][pt], epsilon, 1 - epsilon, xtol=epsilon/2) for pt in
+            res_tp = [optimize.brentq(lambda x: cdf(x, pt) - unifs[i][pt], epsilon, 1 - epsilon, xtol=epsilon / 2) for
+                      pt in
                       range(nb)]
             res.append(res_tp)
 
@@ -273,7 +274,7 @@ class D_vine(conditional):
         if list_models is None:
             list_models = [[cop2d_gaussian, cop2d_student, cop2d_clayton, cop2d_frank, cop2d_gumbel] for i in
                            range(dim - 1)]
-        elif np.ndim(list_models[0])==0:
+        elif np.ndim(list_models[0]) == 0:
             list_models = [list_models for i in range(dim - 1)]
 
         copulae = []
@@ -286,33 +287,34 @@ class D_vine(conditional):
         print('creating the vine copula and selecting the models for each pair')
         for step in range(dim - 1):
 
-            print('step: %r'%step)
+            print('step: %r' % step)
 
             copulae_for_step = []
 
             # selecting and fitting the best copula model for each pair of observations
             for pair in range(dim - step - 1):
 
-                best_copula = None # max(list_models[step], key=lambda cop: cop([obs1[pair], obs2[pair]]).log_likelihood([obs1[pair], obs2[pair]]))
+                pair_obs = [obs1[pair], obs2[pair]]
+                best_copula = max(list_models[step], key=lambda cop: cop(pair_obs).log_likelihood(pair_obs))
                 best_lld = 0
 
                 # print(list_models)
-                for cop in list_models[step]:
-                    # try:
-                    copula_tp = cop([obs1[pair], obs2[pair]])
-                    lld_tp = copula_tp.log_likelihood([obs1[pair], obs2[pair]]) - len(copula_tp.parameter_list())
-                    # print('\n### step: %d copula: %s, log: %r, par: %r\n'%(step,copula_tp.name,lld_tp,copula_tp.par))
-
-                    if best_copula is None:
-                        best_lld = lld_tp
-                        best_copula = copula_tp
-                    else:
-                        if lld_tp > best_lld:
-                            best_copula = copula_tp
-                            best_lld = lld_tp
-                    # except:
-                    #     print([obs1[pair], obs2[pair]])
-                    #     print("could not estimate log likelihood of %dth copula" % pair)
+                # for cop in list_models[step]:
+                #     # try:
+                #     copula_tp = cop([obs1[pair], obs2[pair]])
+                #     lld_tp = copula_tp.log_likelihood([obs1[pair], obs2[pair]]) - len(copula_tp.parameter_list())
+                #     # print('\n### step: %d copula: %s, log: %r, par: %r\n'%(step,copula_tp.name,lld_tp,copula_tp.par))
+                #
+                #     if best_copula is None:
+                #         best_lld = lld_tp
+                #         best_copula = copula_tp
+                #     else:
+                #         if lld_tp > best_lld:
+                #             best_copula = copula_tp
+                #             best_lld = lld_tp
+                #             # except:
+                #             #     print([obs1[pair], obs2[pair]])
+                #             #     print("could not estimate log likelihood of %dth copula" % pair)
 
                 copulae_for_step.append(best_copula)
 
@@ -344,12 +346,12 @@ class D_vine(conditional):
 
             self.dump.append((obs1, obs2))
 
-        name='D_vine'
+        name = 'D_vine'
         for i in copulae:
             for j in i:
-                name='%s_%s'%(name,j.ACR)
+                name = '%s_%s' % (name, j.ACR)
             name += '|'
-        name+=add_name
+        name += add_name
 
         self.dim = dim
         self.copulae = copulae
@@ -381,7 +383,7 @@ class D_vine(conditional):
         if arg_unif is None:
             arg_unif = self.uniforms
 
-        not_list = np.ndim(arg_unif[0])==0
+        not_list = np.ndim(arg_unif[0]) == 0
         if not_list:
             arg_unif = [[i] for i in arg_unif]
 
@@ -421,7 +423,7 @@ class D_vine(conditional):
 
     # returns the density
     def pdf(self, unifs):
-        not_list = np.ndim(unifs[0])==0
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
@@ -495,15 +497,15 @@ class cop2d(object):
     def log_likelihood(self, unifs, theta=None):
         return 0
 
-    ### returns a list of the parameters
+    ## returns a list of the parameters
     def parameter_list(self):
         return []
 
-    ### modifies the parameters of the copula
+    ## modifies the parameters of the copula
     def assign_parameter(self, theta):
         pass
 
-    ### print method for 2d copulae
+    ## print method for 2d copulae
     def pprint(self):
         s = '\n### Copula Model: ' + self.name + ' ###\n\n'
         s += 'parameters: %r' % self.par
@@ -520,7 +522,6 @@ class cop2d(object):
 
 
 # -------------------------------------- 2d copulae models ------------------------------------------------------------
-
 
 ### returns a 'gaussian copula' fitted to the given points
 class cop2d_gaussian(cop2d):
@@ -548,9 +549,9 @@ class cop2d_gaussian(cop2d):
         self.name = 'gaussian'
         self.nbPar = 1
         self.par = {'cov': cov}
-        self.bounds= bounds =[(epsilon-1,1-epsilon)]
+        self.bounds = bounds = [(epsilon - 1, 1 - epsilon)]
 
-        opt_result = optimize.minimize_scalar(self.obs_likelihood, bounds = bounds[0], method='bounded')
+        opt_result = optimize.minimize_scalar(self.obs_likelihood, bounds=bounds[0], method='bounded')
         if opt_result['success']:
             # print('old parameter: %f, new: %f ' % (self.par['cov'][0, 1], opt_result['x']))
             self.par['cov'][0, 1] = opt_result['x']
@@ -570,7 +571,7 @@ class cop2d_gaussian(cop2d):
     def pdf(self, unifs):
 
         cov = self.par['cov']
-        not_list = np.ndim(unifs[0])==0
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
@@ -607,18 +608,18 @@ class cop2d_gaussian(cop2d):
         cov = self.par['cov']
 
         new_var = (1 - cov[0, 1] ** 2)
-        self.norm_obj0=stats.norm(0,1)
-        self.norm_obj1=stats.norm(0, np.sqrt(new_var))
-        self.last_par_1=cov[0,1]
+        self.norm_obj0 = stats.norm(0, 1)
+        self.norm_obj1 = stats.norm(0, np.sqrt(new_var))
+        self.last_par_1 = cov[0, 1]
 
-        def conditionalCDF(unifs,coor):
+        def conditionalCDF(unifs, coor):
 
-            if not self.last_par_1 == self.par['cov'][0,1]:
+            if not self.last_par_1 == self.par['cov'][0, 1]:
                 new_var = (1 - cov[0, 1] ** 2)
-                self.norm_obj1=ut.fast_stats(stats.norm([0], np.sqrt(new_var)))
-                self.last_par_1=cov[0,1]
+                self.norm_obj1 = ut.fast_stats(stats.norm([0], np.sqrt(new_var)))
+                self.last_par_1 = cov[0, 1]
 
-            not_list = np.ndim(unifs)<2
+            not_list = np.ndim(unifs) < 2
             if not_list:
                 unifs = [[i] for i in unifs]
 
@@ -641,8 +642,8 @@ class cop2d_gaussian(cop2d):
     # log-likelihood
     def log_likelihood(self, unifs, theta=None, vects=None):
         if unifs is None:
-            unifs=self.uniforms
-        not_list = np.ndim(unifs[0])==0
+            unifs = self.uniforms
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
@@ -686,7 +687,7 @@ class cop2d_gaussian(cop2d):
 
     # maximize log-likelihood
     def obs_likelihood(self, theta):
-        if np.ndim(theta)>0:
+        if np.ndim(theta) > 0:
             theta = theta[0]
 
         if -1 < theta < 1:
@@ -716,18 +717,18 @@ class cop2d_student(cop2d):
         cor = norm_matrix(np.cov(np.matrix(vects)))
         cor_inv = np.linalg.inv(cor)
 
-        self.cor=cor
+        self.cor = cor
         self.precise = precise
         self.uniforms = uniforms
         self.dim = 2
         self.name = 'student'
         self.length = length
-        self.bounds = [((-1 + 9 * cor[0, 1]) / 10, (1 + 9 * cor[0, 1]) / 10), (2+epsilon, 10)]
+        self.bounds = [((-1 + 9 * cor[0, 1]) / 10, (1 + 9 * cor[0, 1]) / 10), (2 + epsilon, 10)]
 
         theta = self.find_parameter()
 
         # print(theta)
-        v = max(theta[1], 2+epsilon)
+        v = max(theta[1], 2 + epsilon)
         s = np.matrix([[1, theta[0]], [theta[0], 1]])  # no need to multiply by factor (v-2)/v for the uniform
         par = {'v': v, 'sigma': s}
 
@@ -739,7 +740,7 @@ class cop2d_student(cop2d):
 
         if unifs is None:
             unifs = self.uniforms
-        not_list = np.ndim(unifs[0])==0
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
@@ -797,7 +798,7 @@ class cop2d_student(cop2d):
         else:
             opt_result = optimize.minimize(lambda x: -(self.log_likelihood(self.uniforms, theta=[cor[0, 1], x[0]])),
                                            [2.1],
-                                           bounds=[(2+epsilon,10)], method='L-BFGS-B')
+                                           bounds=[(2 + epsilon, 10)], method='L-BFGS-B')
 
         if opt_result['success']:
             if self.precise:
@@ -824,7 +825,7 @@ class cop2d_student(cop2d):
 
     # density function definition
     def pdf(self, unifs):
-        not_list = np.ndim(unifs[0])==0
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
@@ -866,20 +867,20 @@ class cop2d_student(cop2d):
     def createConditionalCDF(self):
         v = self.par['v']
         sigma = self.par['sigma']
-        self.condCDFpar=[v,sigma[0,1]]
+        self.condCDFpar = [v, sigma[0, 1]]
 
-        factor1 = sigma[0,1] / 1
-        factor2 = 1 - sigma[0,1] / 1 * sigma[0,1]
+        factor1 = sigma[0, 1] / 1
+        factor2 = 1 - sigma[0, 1] / 1 * sigma[0, 1]
         variance = math.sqrt(v / (v - 2))
 
         t_obj = stats.t(v)
         new_t_obj = stats.t(v + 1)
 
         def conditionalCDF(unifs, coor):
-            if not  ((self.par['v']==self.condCDFpar[0]) & (self.par['sigma'][0,1]==self.condCDFpar[1])):
-                return self.createConditionalCDF()(unifs,coor)
+            if not ((self.par['v'] == self.condCDFpar[0]) & (self.par['sigma'][0, 1] == self.condCDFpar[1])):
+                return self.createConditionalCDF()(unifs, coor)
 
-            not_list = np.ndim(unifs)<2
+            not_list = np.ndim(unifs) < 2
             if not_list:
                 unifs = [[i] for i in unifs]
 
@@ -890,22 +891,22 @@ class cop2d_student(cop2d):
             else:
                 other = 0
 
-            vecs=np.array([t_obj.ppf(unifs[i]) for i in range(2)])*variance
-            new_sigmas = (v + vecs[coor] ** 2 ) / (v + 1) * factor2
-            new_obs=(vecs[other] - factor1 * vecs[coor]) / np.sqrt(new_sigmas)
+            vecs = np.array([t_obj.ppf(unifs[i]) for i in range(2)]) * variance
+            new_sigmas = (v + vecs[coor] ** 2) / (v + 1) * factor2
+            new_obs = (vecs[other] - factor1 * vecs[coor]) / np.sqrt(new_sigmas)
             probas = new_t_obj.cdf(new_obs)
 
             return probas
 
-        self.conditionalCDF=conditionalCDF
+        self.conditionalCDF = conditionalCDF
         return conditionalCDF
 
     def parameter_list(self):
-        return [self.par['sigma'][0, 1],self.par['v']]
+        return [self.par['sigma'][0, 1], self.par['v']]
 
     def assign_parameter(self, theta):
         self.par['sigma'] = np.matrix([[1, theta[0]], [theta[0], 1]])
-        self.par['v']=theta[1]
+        self.par['v'] = theta[1]
 
 
 ### return a uniform copula for comparison purpose
@@ -918,7 +919,7 @@ class cop2d_uniform(cop2d):
             unifs = [[0.5], [0.5]]
         self.dim = len(unifs)
         self.length = len(unifs[0])
-        self.bounds=[]
+        self.bounds = []
 
     def simulate(self, count):
         return np.random.uniform(0, 1, (self.dim, count))
@@ -944,6 +945,7 @@ class cop2d_uniform(cop2d):
     def assign_parameter(self, theta):
         pass
 
+
 ######################
 ### From dominique ###
 ######################
@@ -968,30 +970,27 @@ class WeightedCopula(cop2d):
         elif dim > 2:
             vects = vects[:2]  # Using only first two rows
 
-
         count = len(models)
         copulas = [copula(vects) for copula in models]
         name = 'weighted'
         if not precise:
-            name+='_simple'
-        for i in copulas:
-            name = '%s_%s' % (name, i.ACR)
-            self.ACR += '-' + i.ACR
+            name += '_simple'
+        for copula in copulas:
+            name += '_' + copula.ACR
+            self.ACR += '-' + copula.ACR
 
         if count > max_models:
-            lld = [len(cop.parameter_list())-cop.log_likelihood(vects) for cop in copulas]
+            lld = [len(cop.parameter_list()) - cop.log_likelihood(vects) for cop in copulas]
             # print(lld)
-            indexes=sorted(range(count),key=lld.__getitem__)[:max_models]
-            copulas=list(map(copulas.__getitem__,indexes))
-            models=list(map(models.__getitem__,indexes))
-            count=max_models
+            indexes = sorted(range(count), key=lld.__getitem__)[:max_models]
+            copulas = list(map(copulas.__getitem__, indexes))
+            models = list(map(models.__getitem__, indexes))
+            count = max_models
 
         self.models = models
         self.copulas = copulas
         self.count = count
         self.uniforms = vects
-
-
 
         self.name = name
         '''
@@ -1013,48 +1012,47 @@ class WeightedCopula(cop2d):
                 raise RuntimeError('No optimal weights found')
         else:
         '''
-        par_indexes=[count]
-        guess=[1 / count] * count
-        bounds = [(0, 1),] * count
-        optimize_too = [] # the copulas index whose parameter will be optimized along the weights
+        par_indexes = [count]
+        guess = [1 / count] * count
+        bounds = [(0, 1), ] * count
+        optimize_too = []  # the copulas index whose parameter will be optimized along the weights
 
         if precise:
             for i in range(count):
-                cop=self.copulas[i]
-                if not cop.ACR in {'GA','ST'}:
+                cop = self.copulas[i]
+                if not cop.ACR in {'GA', 'ST'}:
                     optimize_too.append(i)
-                    par_tp=cop.parameter_list()
-                    par_indexes.append(par_indexes[-1]+len(par_tp))
+                    par_tp = cop.parameter_list()
+                    par_indexes.append(par_indexes[-1] + len(par_tp))
                     guess.extend(par_tp)
                     bounds.extend(cop.bounds)
 
-        self.optimize_too=optimize_too
+        self.optimize_too = optimize_too
         self.last_pdfs = [None] * self.count
         self.last_par = [np.inf] * self.count
         self.par_indexes = par_indexes
 
         def log_likelihood_opt(par):
-            a=10
+            a = 10
             for i in range(len(optimize_too)):
-                self.copulas[optimize_too[i]].assign_parameter(par[par_indexes[i]:par_indexes[i+1]])
+                self.copulas[optimize_too[i]].assign_parameter(par[par_indexes[i]:par_indexes[i + 1]])
 
-            sum_coeffs=sum(par[:count])
-            res_tp=-self.log_likelihood(None,theta=par)
-            res_tp+= a*(1-sum_coeffs)**2
+            sum_coeffs = sum(par[:count])
+            res_tp = -self.log_likelihood(None, theta=par)
+            res_tp += a * (1 - sum_coeffs) ** 2
 
             return res_tp
 
-        self.log_likelihood_opt=log_likelihood_opt
+        self.log_likelihood_opt = log_likelihood_opt
 
-        opt_results = optimize.minimize(log_likelihood_opt, guess,bounds=bounds)
+        opt_results = optimize.minimize(log_likelihood_opt, guess, bounds=bounds)
         if opt_results['success']:
-            sum_coeffs=sum(opt_results['x'][:count])
+            sum_coeffs = sum(opt_results['x'][:count])
             for i in range(count):
-                opt_results['x'][i]/=sum_coeffs
+                opt_results['x'][i] /= sum_coeffs
             self.par = opt_results['x']
         else:
             raise RuntimeError('No optimal weights found')
-
 
     def single_pdf(self, x, weights=None):
         """Returns a single pdf given a list x1, x2, ..., xn of weights and a point x"""
@@ -1065,49 +1063,48 @@ class WeightedCopula(cop2d):
         return sum(weight * copula.pdf(x)[0] for (weight, copula) in zip(weights, self.copulas))
 
     def log_likelihood(self, unifs, theta=None):
-        unifs_none=unifs is None
+        unifs_none = unifs is None
         if unifs_none:
             unifs = self.uniforms
         if theta is None:
             theta = self.par
 
         # checking if the pdf values have already been computed
-        already_computed = [ (self.last_pdfs[i] is not None)&unifs_none for i in range(self.count)]
+        already_computed = [(self.last_pdfs[i] is not None) & unifs_none for i in range(self.count)]
 
         for i in range(len(self.optimize_too)):
             index = self.optimize_too[i]
-            start,end = self.par_indexes[i],self.par_indexes[i+1]
+            start, end = self.par_indexes[i], self.par_indexes[i + 1]
             last_parameter = [j for j in self.last_par[start:end]]
             new_parameter = [j for j in theta[start:end]]
-            already_computed[index] &= all([ j[0]==j[1] for j in zip(*[ last_parameter , new_parameter ])])
+            already_computed[index] &= all([j[0] == j[1] for j in zip(*[last_parameter, new_parameter])])
 
-        pdfs_tp=[]
+        pdfs_tp = []
         for i in range(self.count):
             if already_computed[i]:
                 pdfs_tp.append(self.last_pdfs[i])
             else:
                 pdfs_tp.append(self.copulas[i].pdf(unifs))
 
-
         if unifs_none:
-            self.last_par=theta.copy()
-            self.last_pdfs=pdfs_tp
+            self.last_par = theta.copy()
+            self.last_pdfs = pdfs_tp
 
         # computing the log-likelihood
         pdfs = zip(*pdfs_tp)
-        sum_coeffs=sum(theta[:self.count])
-        coeffs=[i/sum_coeffs for i in theta[:self.count]]
+        sum_coeffs = sum(theta[:self.count])
+        coeffs = [i / sum_coeffs for i in theta[:self.count]]
         res = sum(np.log(sum(weight * pdf for (weight, pdf) in zip(coeffs, point))) for point in pdfs)
         return res
 
     def pdf(self, unifs):
-        if np.ndim(unifs)<2:
+        if np.ndim(unifs) < 2:
             unifs = [[i] for i in unifs]
         points = zip(*unifs)
         return [self.single_pdf(point) for point in points]
 
     def conditionalCDF(self, unifs, coor):
-        if np.ndim(unifs)<2:
+        if np.ndim(unifs) < 2:
             unifs = [[i] for i in unifs]
         return list(
             np.sum([np.array(self.copulas[i].conditionalCDF(unifs, coor)) * self.par[i] for i in range(self.count)], 0))
@@ -1146,8 +1143,7 @@ class WeightedCopula(cop2d):
         return [list(i) for i in zip(*res)]
 
     def get_names(self):
-        return [self.copulas[i].ACR for i in range(self.count) if self.par[i]!=0]
-
+        return [self.copulas[i].ACR for i in range(self.count) if self.par[i] != 0]
 
     def parameter_list(self):
         return self.par
@@ -1172,7 +1168,7 @@ class cop2d_clayton(cop2d):
             vects = vects[:2]  # Using only first two rows
         self.uniforms = vects
         self.name = 'clayton'
-        self.bounds = bounds = [(epsilon,10)]
+        self.bounds = bounds = [(epsilon, 10)]
 
         tau = stats.kendalltau(vects[0], vects[1])[0]
         # Calculate Theta
@@ -1203,7 +1199,7 @@ class cop2d_clayton(cop2d):
     def pdf(self, unifs):
         """Computes pdf for a list of lists"""
         theta = self.par['theta']
-        if np.ndim(unifs)<2:
+        if np.ndim(unifs) < 2:
             unifs = [[i] for i in unifs]
         points = zip(*unifs)
         return [self.single_pdf(u, v, theta) for (u, v) in points]
@@ -1214,7 +1210,7 @@ class cop2d_clayton(cop2d):
         return (u ** (-theta) + v ** (-theta) - 1) ** (-1 / theta - 1) * u ** (-theta - 1)
 
     def conditionalCDF(self, unifs, coor):
-        not_list = np.ndim(unifs[0])==0
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
@@ -1271,7 +1267,7 @@ class cop2d_gumbel(cop2d):
             vects = vects[:2]  # Using only first two rows
         self.uniforms = vects
         self.name = 'gumbel'
-        self.bounds = bounds = [(1+epsilon,10)]
+        self.bounds = bounds = [(1 + epsilon, 10)]
 
         tau = stats.kendalltau(vects[0], vects[1])[0]
         # Calculate Theta
@@ -1307,7 +1303,7 @@ class cop2d_gumbel(cop2d):
 
     def pdf(self, unifs):
         """computes pdf for a list of lists [[x1, x2, ..., xn], [y1, y2, ..., yn"""
-        if np.ndim(unifs)<2:
+        if np.ndim(unifs) < 2:
             unifs = [[i] for i in unifs]
         points = zip(*unifs)
         return [self.single_pdf(u, v, self.par['theta']) for (u, v) in points]
@@ -1320,7 +1316,7 @@ class cop2d_gumbel(cop2d):
         return first * second * third
 
     def conditionalCDF(self, unifs, coor):
-        not_list = np.ndim(unifs[0])==0
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
@@ -1414,7 +1410,7 @@ class cop2d_frank(cop2d):
                 print('optimiztion did not converge')
                 theta = max(epsilon, theta)
         else:
-            self.bounds = bounds = [(-40,-epsilon)]
+            self.bounds = bounds = [(-40, -epsilon)]
             opt_result = optimize.minimize_scalar(lambda x: -self.log_likelihood(vects, theta=x),
                                                   bounds=bounds[0],
                                                   method='bounded')
@@ -1435,7 +1431,7 @@ class cop2d_frank(cop2d):
 
     def pdf(self, unifs):
         """Computes pdf for a list of lists"""
-        if np.ndim(unifs)<2:
+        if np.ndim(unifs) < 2:
             unifs = [[i] for i in unifs]
         points = zip(*unifs)
         return [self.single_pdf(u, v, self.par['theta']) for (u, v) in points]
@@ -1468,7 +1464,7 @@ class cop2d_frank(cop2d):
         return numer / denom
 
     def conditionalCDF(self, unifs, coor):
-        not_list = np.ndim(unifs[0])==0
+        not_list = np.ndim(unifs[0]) == 0
         if not_list:
             unifs = [[i] for i in unifs]
 
