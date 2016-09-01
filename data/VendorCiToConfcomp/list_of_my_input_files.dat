@@ -1,0 +1,3 @@
+# list of files to be processed by ForecastToConfComp.py
+ll EMS_lower_limit_11-15--01-16.csv
+ul EMS_upper_limit_11-15--01-16.csv
