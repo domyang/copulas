@@ -95,6 +95,9 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
     if start_incr is None:
         start_incr = win_days
 
+    if list_models is None:
+        list_models = [mod.cop_gaussian, mod.cop_student]
+
     start_time = time.time()
 
     # keeping the old window parameters in param_fixed
@@ -110,8 +113,8 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
     errors = copula.vectM
     dates = copula.dateM
 
-    print('forecasts (%d) %r\nerrors (%d) %r\ndates (%d) %r' % (len(forecasts[0]), forecasts[0][:8],
-                                                                len(errors), errors[:8], len(dates), dates[:8]))
+    print('forecasts (%d) %s\nerrors (%d) %s\ndates (%d) %s' % (len(forecasts[0]), forecasts[0][:8],
+                                                                len(errors[0]), errors[0][:8], len(dates), dates[:8]))
 
     incr = 0
     first = True
@@ -132,9 +135,8 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
         incr += 1
         if incr < start_incr:
             continue
-        if end_incr is not None:
-            if incr >= end_incr:
-                continue
+        if end_incr is not None and incr >= end_incr:
+            continue
 
         # printing information
         def print_info(last_time=last_time):
@@ -173,8 +175,6 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
         densities = [ut.create_gaussian_density(vects)]
 
         # creating a list of copula models
-        if list_models is None:
-            list_models = [mod.cop_gaussian, mod.cop_student]
         models = []
         for i, model in enumerate(list_models):
             # print('\n### %d th model###' % i)
@@ -211,22 +211,11 @@ def test_models(copula, win_days=90, list_models=None, repeat_win_days=False, wi
 
         # computing the rank of 'obs' among the window points
         CDFs = ut.marginals_cdf(vects)
-        rank = [float(CDFs[i](error[i])) for i in range(dim)]
+        rank = [float(cdf(err)) for cdf, err in zip(CDFs, error)]
 
         # computing the tail metrics:
         C_to_D = ut.copula_to_distribution(vects)
         simulations = [cop.simulate(10000) for cop in models]
-
-        """
-        for i in range(len(models)):
-            if not 0 < np.min(simulations[i]) < np.max(simulations[i]) < 1:
-                print(i)
-                print(simulations[i])
-                print(copula.lengthM)
-                print(models[i].print_names())
-                print(models[i].print_par())
-                return models[i]
-        """
 
         simulations = [C_to_D(sim) for sim in simulations]
         tail_metrics = ut.compare_tails(simulations, vects, error, quantile=0.1)
@@ -555,7 +544,6 @@ def get_data(filename=None, type='Wind', location='total', sourcefile=None):
         csv_read = csv.reader(open(sourcefile))
         index = -1
         index_dir = -1
-        break1 = False
         for line in csv_read:
             if (len(line) < 1) or (line[1] == '#'):
                 continue
@@ -565,8 +553,6 @@ def get_data(filename=None, type='Wind', location='total', sourcefile=None):
                         index = i
                     if line[i] == 'home_dir':
                         index_dir = i
-            if (break1):
-                break
         if (index == -1) or (index_dir == -1):
             print('data specification is not valid 1')
             return -1

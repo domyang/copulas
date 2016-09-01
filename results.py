@@ -248,6 +248,9 @@ class Results:
             writer = csv.writer(f, lineterminator='\n')
             rows = []
             for param in sorted(self.parameters):
+                if param == 'date_range':
+                    rows.append(('date_range',)+self.date_range)
+                    continue
                 rows.append([param, self.parameters[param]])
             rows.append(['Copula', 'Mean Log-likelihood', 'EMD fit all', 'EMD fit main', 'EMD all',
                              'EMD low', 'EMD up'])
@@ -257,6 +260,10 @@ class Results:
                 rows.append(map(str, [name, log, fit_all, fit_main, all, low, up]))
 
             writer.writerows(rows)
+
+    @property
+    def date_range(self):
+        return self.dates[0], self.dates[-1]
 
     def __iter__(self):
         return iter(self.events)

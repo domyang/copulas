@@ -56,11 +56,13 @@ class CopulaManagerMS:
         self.parameters = [ser['title'] for ser in series]
 
         if series is None:
-            raise (RuntimeError("you need to give a 'series' argument to create a copulaManager"))
+            raise RuntimeError("you need to give a 'series' argument to create a copulaManager")
 
         self.nbSeries = nbSeries = len(series)
+
         if nbSeries < 1:
-            raise (RuntimeError('Series should contain at least 1 element'))
+            raise RuntimeError('Series should contain at least 1 element')
+
         for ser in series:
             if not {'date', 'vect', 'data', 'title'}.issubset(ser.keys()):
                 raise (RuntimeError(
@@ -68,15 +70,14 @@ class CopulaManagerMS:
 
         self.parameters = [parameters_def.copy() for _ in range(nbSeries)]
 
-        for i in range(nbSeries):
-            for key in series[i]['title']:
-                self.parameters[i][key] = series[i]['title'][key]
+        for ser, par in zip(series, self.parameters):
+            par.update(ser['title'])
 
         copulae = []
-        for i, ser in enumerate(series):
+        for ser, par in zip(series, self.parameters):
             # print('%r\n%r\n%r\n%r'% (ser['date'],ser['vect'],ser['data'],par[i]))
             copulae.append(
-                cop.CopulaManager(ser['date'], ser['vect'], ser['data'], self.parameters[i],
+                cop.CopulaManager(ser['date'], ser['vect'], ser['data'], par,
                                   var_function=ser['var_function']))
         self.copulae = copulae
 
@@ -122,22 +123,16 @@ class CopulaManagerMS:
 
         # 3 - taking only the dates that correspond
 
-        date_max = copulae[0].dateM[-1]
-        date_min = copulae[0].dateM[0]
+        date_max = min([copula.dateM[-1] for copula in copulae])
+        date_min = max([copula.dateM[0] for copula in copulae])
 
         # print('date range: %s %s' % (str(date_min), str(date_max)))
 
-        dates = []
-
-        for i in range(nbSeries):
-            d = copulae[i].dateM
-            dates.append(iter(d))
-            date_min = max(date_min, d[0])
-            date_max = min(date_max, d[-1])
+        date_iters = [iter(copula.dateM) for copula in copulae]
 
         current_indexes = [0] * nbSeries
         date_indexes = [[] for _ in range(nbSeries)]
-        dates_element = [next(dates[i]) for i in range(nbSeries)]
+        dates_element = [next(date_iter) for date_iter in date_iters]
         dateM = []
 
         cur = date_min
@@ -146,7 +141,7 @@ class CopulaManagerMS:
             b = True
             for i in range(nbSeries):
                 while dates_element[i] < cur:
-                    dates_element[i] = next(dates[i])
+                    dates_element[i] = next(date_iters[i])
                     current_indexes[i] += 1
 
                 if dates_element[i] != cur:
